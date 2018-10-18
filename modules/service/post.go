@@ -2,11 +2,11 @@ package service
 
 import (
 	"fmt"
+	"github.com/Silvman/tech-db-forum/models"
+	"github.com/Silvman/tech-db-forum/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
 	"log"
 	"strconv"
-	"github.com/Silvman/tech-db-forum/models"
-	"github.com/Silvman/tech-db-forum/restapi/operations"
 )
 
 func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.Responder {
@@ -105,7 +105,7 @@ func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.
 			&ePost.Thread,
 			&ePost.Author,
 		); err != nil {
-		currentErr := models.Error{Message:fmt.Sprintf("Can't find post with id: %d", params.ID)}
+		currentErr := models.Error{Message: fmt.Sprintf("Can't find post with id: %d", params.ID)}
 		return operations.NewPostUpdateNotFound().WithPayload(&currentErr)
 	}
 
@@ -124,41 +124,73 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	}
 	defer tx.Rollback()
 
-	// проверки slug или id
-	// заселектить тред со слагом\айди. получить айди и дальше с ним работать
+	var tIdCurrent int32
+	if err := tx.QueryRow("select id, slug form threads where id = $1 or slug = $1", params.SlugOrID).Scan(&tIdCurrent); err != nil {
+		currentErr := models.Error{}
+		if _, err := strconv.Atoi(params.SlugOrID); err != nil {
+			currentErr.Message = fmt.Sprintf("Can't find post thread by slug: %s", params.SlugOrID)
+		} else {
+			currentErr.Message = fmt.Sprintf("Can't find post thread by id: %s", params.SlugOrID)
+		}
 
-	query := `with now_time as (select current_time as ct)
-insert into posts (parent, message, isEdit, created, thread, author) values ($1, $2, false, now_time.ct, $3, $4)`
+		return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
+	}
+
+	query := `with now_time as (select current_time as ct) insert into posts (parent, message, created, thread, author) values ($1, $2, now_time.ct, $3, $4)`
 	queryEnd := " returning id, parent, message, isEdit, created, thread, author"
-
 
 	args := []interface{}{}
 	post1 := params.Posts[0]
-	args = append(args, post1.Parent, post1.Message, post1.Author, params.SlugOrID)
+	args = append(args, post1.Parent, post1.Message, post1.Author, tIdCurrent)
 
-	for _, value := range params.Posts {
+	for key, value := range params.Posts {
 		if value.Parent != 0 {
-			var pId int64
 			var tId int32
 
-			if err := tx.QueryRow(`select id, thread from posts where id = $1`, value.Parent, tId).Scan(&pId); err != nil {
-				currentErr := models.Error{Message:fmt.Sprintf("Parent post is not found")}
+			// Нет в документации к апи!
+			if err := tx.QueryRow(`select thread from posts where id = $1`, value.Parent).Scan(&tId); err != nil {
+				currentErr := models.Error{Message: fmt.Sprintf("Parent post is not found")}
 				return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
 			}
 
+			if tId != tIdCurrent {
+				currentErr := models.Error{Message: fmt.Sprintf("Parent post was created in another thread")}
+				return operations.NewPostsCreateConflict().WithPayload(&currentErr)
+			}
+
+			var nick string
+			if err := tx.QueryRow("select nickname from users where id = $1", value.Author).Scan(&nick); err != nil {
+				currentErr := models.Error{Message: fmt.Sprintf("Can't find post author by nickname: %s", value.Author)}
+				return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
+			}
 		}
 
-		query += fmt.Sprintf(", ($%d, $%d, false, now_time.ct, $%d, $%d)", len(args) + 1, len(args) + 2, len(args) + 3, len(args) + 4)
-		args = append(args, value.Parent, value.Message, value.Author, params.SlugOrID)
+		if key == 0 {
+			continue
+		}
+
+		query += fmt.Sprintf(", ($%d, $%d, now_time.ct, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4)
+		args = append(args, value.Parent, value.Message, value.Author, tIdCurrent)
 	}
 
+	query += queryEnd
+
 	posts := models.Posts{}
-	if rows, err :=
+	rows, err := tx.Query(query, args...)
+	if err != nil {
+		log.Println(err)
+	}
+
+	for rows.Next() {
+		t := models.Post{}
+		rows.Scan(&t.ID, &t.Parent, &t.Message, &t.IsEdited, &t.Created, &t.Thread, &t.Author)
+		posts = append(posts, &t)
+	}
 
 	err = tx.Commit()
 	if err != nil {
 		log.Println(err)
 	}
 
-	return operations.NewPostsCreateCreated()
+	return operations.NewPostsCreateCreated().WithPayload(posts)
 }

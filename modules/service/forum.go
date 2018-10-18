@@ -2,10 +2,10 @@ package service
 
 import (
 	"fmt"
+	"github.com/Silvman/tech-db-forum/models"
+	"github.com/Silvman/tech-db-forum/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
 	"log"
-	"github.com/Silvman/tech-db-forum/models"
-	"github.com/Silvman/gtech-db-forum/restapi/operations"
 )
 
 const qSelectForumBySlug = `SELECT slug, title, posts, threads, owner FROM forums WHERE slug=$1`
