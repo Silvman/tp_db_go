@@ -4,7 +4,6 @@ package restapi
 
 import (
 	"crypto/tls"
-	"github.com/go-openapi/runtime/middleware"
 	"log"
 	"net/http"
 
@@ -61,10 +60,7 @@ func configureAPI(api *operations.ForumAPI) http.Handler {
 	api.ThreadGetOneHandler = operations.ThreadGetOneHandlerFunc(handler.ThreadGetOne)
 	api.ThreadUpdateHandler = operations.ThreadUpdateHandlerFunc(handler.ThreadUpdate)
 	api.ThreadVoteHandler = operations.ThreadVoteHandlerFunc(handler.ThreadVote)
-
-	api.ThreadGetPostsHandler = operations.ThreadGetPostsHandlerFunc(func(params operations.ThreadGetPostsParams) middleware.Responder {
-		return middleware.NotImplemented("operation .ThreadGetPosts has not yet been implemented")
-	})
+	api.ThreadGetPostsHandler = operations.ThreadGetPostsHandlerFunc(handler.ThreadGetPosts)
 
 	api.ServerShutdown = func() {}
 

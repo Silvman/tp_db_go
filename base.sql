@@ -1,55 +1,75 @@
 create extension if not exists citext;
 create table users (
-  nickname    citext PRIMARY KEY,
-  fullname    TEXT,
-  about       TEXT,
-  email       TEXT NOT NULL,
+  nickname    citext collate "ucs_basic" primary key,
+  fullname    text default '',
+  about       text default '',
+  email       citext not null,
 
-  CONSTRAINT  email_unique UNIQUE(email)
+  constraint  email_unique unique(email)
 );
+create unique index uniq_nickname on users(nickname);
 
 create table forums (
-  slug        TEXT PRIMARY KEY,
-  title       TEXT,
-  owner       citext REFERENCES users(nickname),
-  posts       BIGINT DEFAULT 0,
-  threads     BIGINT DEFAULT 0
+  slug        citext primary key,
+  title       text not null,
+  owner       citext references users(nickname),
+  posts       bigint default 0,
+  threads     bigint default 0
 );
+create unique index uniq_slug on forums(slug);
 
 create table threads (
-  id          BIGSERIAL PRIMARY KEY,
-  title       TEXT,
-  message     TEXT,
-  votes       BIGINT,
-  slug        TEXT,
-  created     TIME DEFAULT CURRENT_TIME,
-  forum       TEXT REFERENCES forums(slug),
-  author      citext REFERENCES users(nickname),
+  id          bigserial primary key,
+  title       text not null,
+  message     text not null,
+  votes       bigint default 0,
+  slug        citext,
+  created     timestamp with time zone default current_timestamp,
+  forum       citext references forums(slug),
+  author      citext collate "ucs_basic" references users(nickname),
 
-  CONSTRAINT  slug_unique UNIQUE(slug)
+  constraint  slug_unique unique(slug)
 );
 
 create table posts (
-  id          BIGSERIAL PRIMARY KEY,
-  parent      BIGINT,
-  parents     BIGINT[],
-  message     TEXT,
-  isEdit      BOOLEAN DEFAULT false ,
-  forum       TEXT REFERENCES forums(slug),
-  created     TIME DEFAULT CURRENT_TIME,
-  thread      BIGINT REFERENCES threads(id),
-  author      citext REFERENCES users(nickname)
+  id          bigserial primary key,
+  parent      bigint default 0,
+--   parents     bigint[],
+  message     text not null,
+  isEdit      boolean default false,
+  forum       citext references forums(slug),
+  created     timestamp with time zone default current_timestamp,
+  thread      bigint references threads(id),
+  author      citext collate "ucs_basic" references users(nickname)
 );
 
 create table votes (
-  author      citext references users(nickname),
+  author      citext collate "ucs_basic" references users(nickname),
   thread      bigint references threads(id),
-  vote        int
+  vote        int default 1,
+
+  constraint  author_thread_unique unique(author, thread)
 );
 
-drop trigger if exists recount_votes_trigger on votes;
-drop trigger if exists new_post_trigger on posts;
-drop trigger if exists new_thread_trigger on threads;
+
+create or replace function recount_votes() returns trigger as $$
+begin
+  update threads set votes = a.v from (select sum(vote) as v from votes where thread = new.thread group by thread) as a
+  where threads.id = new.thread;
+  return new;
+end;
+$$ language plpgsql;
+
+create or replace function inc_counters() returns trigger as $$
+begin
+  if tg_name = 'new_post_trigger' then
+    update forums set posts = posts + 1 where slug = new.forum;
+  elseif tg_name = 'new_thread_trigger' then
+    update forums set threads = threads + 1 where slug = new.forum;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
 
 create trigger recount_votes_trigger
   after insert or update on votes
@@ -62,24 +82,3 @@ create trigger new_post_trigger
 create trigger new_thread_trigger
   after insert on threads
   for each row execute procedure inc_counters();
-
-create or replace function recount_votes() returns trigger as $$
-  begin
-    update threads set votes = a.v from (select sum(vote) as v from votes where thread = NEW.thread group by thread) as a
-    where threads.id = NEW.thread;
-    return NEW;
-  end;
-$$ language plpgsql;
-
-create or replace function inc_counters() returns trigger as $$
-  begin
-    if tg_name = 'new_post_trigger' then
-      update forums set posts = posts + 1 where slug = NEW.forum;
-    elseif tg_name = 'new_thread_trigger' then
-      update forums set threads = threads + 1 where slug = NEW.forum;
-    end if;
-    return NEW;
-  end;
-$$ language plpgsql;
-
-

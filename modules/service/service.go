@@ -14,7 +14,7 @@ func (self HandlerDB) Clear(params operations.ClearParams) middleware.Responder 
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`truncate table users, forums, threads, posts`); err != nil {
+	if _, err := tx.Exec(`truncate table votes, users, forums, threads, posts`); err != nil {
 		log.Println(err)
 	}
 

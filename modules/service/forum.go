@@ -5,11 +5,13 @@ import (
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/Silvman/tech-db-forum/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
+	"github.com/jackc/pgx/pgtype"
 	"log"
 )
 
-const qSelectForumBySlug = `SELECT slug, title, posts, threads, owner FROM forums WHERE slug=$1`
-const qInsertForum = `INSERT INTO forums (slug, title, owner) VALUES ($1, $2, $3) RETURNING owner`
+const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug=$1`
+const qInsertForum = `insert into forums (slug, title, owner) values ($1, $2, $3) returning owner`
 
 /*
 func (self HandlerDB) () middleware.Responder {
@@ -37,7 +39,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 
 	forumExisting := models.Forum{}
 
-	if err = tx.QueryRow(qSelectForumBySlug, &params.Forum.Slug).
+	if err = tx.QueryRow(qSelectForumBySlug, params.Forum.Slug).
 		Scan(
 			&forumExisting.Slug,
 			&forumExisting.Title,
@@ -48,10 +50,15 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 		return operations.NewForumCreateConflict().WithPayload(&forumExisting)
 	}
 
-	if err := tx.QueryRow(qInsertForum, &params.Forum.Slug, &params.Forum.Title, &params.Forum.User).
-		Scan(&params.Forum.User); err != nil {
-		currError := models.Error{Message: fmt.Sprintf("Can't find forum with slug: %s", params.Forum.Slug)}
+	var nickname string
+	if err := tx.QueryRow(`select nickname from users where nickname = $1`, params.Forum.User).Scan(&nickname); err != nil {
+		currError := models.Error{Message: fmt.Sprintf("Can't find user with nickname: %s", params.Forum.User)}
 		return operations.NewForumCreateNotFound().WithPayload(&currError)
+	}
+
+	if err := tx.QueryRow(qInsertForum, params.Forum.Slug, params.Forum.Title, nickname).
+		Scan(&params.Forum.User); err != nil {
+		log.Println(err)
 	}
 
 	tx.Commit()
@@ -67,7 +74,7 @@ func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middlewar
 
 	forumExisting := models.Forum{}
 
-	if err = tx.QueryRow(qSelectForumBySlug, params.Slug).
+	if err = tx.QueryRow("select slug, title, posts, threads, owner from forums where slug = $1", params.Slug).
 		Scan(
 			&forumExisting.Slug,
 			&forumExisting.Title,
@@ -76,11 +83,10 @@ func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middlewar
 			&forumExisting.User,
 		); err != nil {
 		currError := models.Error{Message: fmt.Sprintf("Can't find forum with slug: %s", params.Slug)}
-		operations.NewForumGetOneNotFound().WithPayload(&currError)
+		return operations.NewForumGetOneNotFound().WithPayload(&currError)
 	}
 
 	tx.Commit()
-
 	return operations.NewForumGetOneOK().WithPayload(&forumExisting)
 }
 
@@ -91,27 +97,29 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 	}
 	defer tx.Rollback()
 
-	if rows, _ := tx.Query(qSelectForumBySlug, params.Slug); rows.Next() == false {
+	var eSlug string
+	if err = tx.QueryRow("select slug from forums where slug = $1", params.Slug).Scan(&eSlug); err != nil {
 		currError := models.Error{Message: fmt.Sprintf("Can't find forum with slug: %s", params.Slug)}
-		return operations.NewForumGetThreadsNotFound().WithPayload(&currError)
+		return operations.NewForumGetOneNotFound().WithPayload(&currError)
 	}
 
 	args := []interface{}{}
-	query := `select (id, title, message, votes, slug, created, forum, author) from threads where slug = $1`
+	query := `select id, title, message, votes, slug, created, forum, author from threads where forum = $1`
 	args = append(args, params.Slug)
 
 	if params.Since != nil {
-		args = append(args, *params.Since)
-		query += fmt.Sprintf(" and created >= $%d", len(args))
+		args = append(args, params.Since.String())
+		if params.Desc != nil && *params.Desc {
+			query += fmt.Sprintf(" and created <= $%d::timestamptz", len(args))
+		} else {
+			query += fmt.Sprintf(" and created >= $%d::timestamptz", len(args))
+		}
 	}
 
-	if params.Desc != nil {
-		query += " order by created"
-		if *params.Desc {
-			query += " desc"
-		} else {
-			query += " asc"
-		}
+	query += " order by created"
+
+	if params.Desc != nil && *params.Desc {
+		query += " desc"
 	}
 
 	if params.Limit != nil {
@@ -120,12 +128,27 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 	}
 
 	rows, err := tx.Query(query, args...)
-	existingThreads := models.Threads{}
 
+	existingThreads := models.Threads{}
+	pgTime := pgtype.Timestamptz{}
+	pgSlug := pgtype.Text{}
 	for rows.Next() {
-		t := models.Thread{}
-		rows.Scan(&t.ID, &t.Title, &t.Message, &t.Votes, &t.Slug, &t.Created, &t.Forum, &t.Author)
-		existingThreads = append(existingThreads, &t)
+		thread := models.Thread{}
+		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &pgTime, &thread.Forum, &thread.Author)
+		if err != nil {
+			log.Println(err)
+		}
+
+		if pgSlug.Status != pgtype.Null {
+			thread.Slug = pgSlug.String
+		}
+
+		t := strfmt.NewDateTime()
+		t.Scan(pgTime.Time)
+
+		thread.Created = &t
+
+		existingThreads = append(existingThreads, &thread)
 	}
 	tx.Commit()
 
@@ -139,24 +162,31 @@ func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middl
 	}
 	defer tx.Rollback()
 
-	if rows, _ := tx.Query(qSelectForumBySlug, params.Slug); rows.Next() == false {
-		currError := models.Error{Message: fmt.Sprintf("Can't find forum with slug: %s", params.Slug)}
-		return operations.NewForumGetThreadsNotFound().WithPayload(&currError)
+	var eSlug string
+	if err = tx.QueryRow("select slug from forums where slug = $1", params.Slug).Scan(&eSlug); err != nil {
+		currError := models.Error{Message: fmt.Sprintf("Can't find forum by slug: %s", params.Slug)}
+		return operations.NewForumGetOneNotFound().WithPayload(&currError)
 	}
 
 	args := []interface{}{}
 	args = append(args, params.Slug)
 
-	qOuter := `select (nickname, fullname, about, email) from users where nickname in (`
+	qOuter := `select nickname, fullname, about, email from users where nickname in (`
 	qSelectUserThreads := `select distinct (author) from threads where forum = $1`
 	qSelectUserPosts := `select distinct (p.author) from posts p`
 	qJoin := `join threads t on p.thread = t.id where t.forum = $1`
 	qOuterClose := `) order by nickname`
 
 	if params.Since != nil {
-		args = append(args, *params.Since)
-		qSelectUserThreads += fmt.Sprintf(" and id > $%d", len(args))
-		qSelectUserPosts += fmt.Sprintf(" and p.id > $%d", len(args))
+		if params.Desc != nil && *params.Desc {
+			args = append(args, *params.Since)
+			qSelectUserThreads += fmt.Sprintf(" and author < $%d", len(args))
+			qJoin += fmt.Sprintf(" and p.author < $%d", len(args))
+		} else {
+			args = append(args, *params.Since)
+			qSelectUserThreads += fmt.Sprintf(" and author > $%d", len(args))
+			qJoin += fmt.Sprintf(" and p.author > $%d", len(args))
+		}
 	}
 
 	if params.Desc != nil {
@@ -174,7 +204,12 @@ func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middl
 
 	query := qOuter + qSelectUserThreads + " union " + qSelectUserPosts + " " + qJoin + qOuterClose
 
+	log.Println(query)
+
 	rows, err := tx.Query(query, args...)
+
+	log.Println(err)
+
 	existingUsers := models.Users{}
 
 	for rows.Next() {

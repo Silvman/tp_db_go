@@ -2,10 +2,11 @@ package service
 
 import (
 	"fmt"
-	"github.com/go-openapi/runtime/middleware"
-	"log"
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/Silvman/tech-db-forum/restapi/operations"
+	"github.com/go-openapi/runtime/middleware"
+	"log"
+	"strings"
 )
 
 func (self HandlerDB) UserCreate(params operations.UserCreateParams) middleware.Responder {
@@ -67,47 +68,52 @@ func (self HandlerDB) UserUpdate(params operations.UserUpdateParams) middleware.
 	}
 	defer tx.Rollback()
 
-	eUser := models.User{}
+	tempUser := models.User{}
 	if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, params.Nickname).
-		Scan(&eUser.Nickname, &eUser.Fullname, &eUser.About, &eUser.Email); err != nil {
+		Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
 		currentErr := models.Error{Message: fmt.Sprintf("Can't find user by nickname: %s", params.Nickname)}
 		return operations.NewUserUpdateNotFound().WithPayload(&currentErr)
 	}
 
-	query := `update users set`
+	query := `update users set `
+	var queryParams []string
 
 	args := []interface{}{}
 	if params.Profile.Fullname != "" || params.Profile.Email != "" || params.Profile.About != "" {
 		if params.Profile.Fullname != "" {
-			eUser.Fullname = params.Profile.Fullname
+			tempUser.Fullname = params.Profile.Fullname
 			args = append(args, params.Profile.Fullname)
-			query += fmt.Sprintf(" fullname = $%d", len(args))
+			queryParams = append(queryParams, fmt.Sprintf("fullname = $%d", len(args)))
 		}
 
 		if params.Profile.Email != "" {
-			if rows, _ := tx.Query(`select nickname from users where email = $1`, params.Profile.Email); rows.Next() == true {
-				var nickname string
-				rows.Scan(&nickname)
+			var nickname string
+			if err := tx.QueryRow(`select nickname from users where email = $1`, params.Profile.Email.String()).Scan(&nickname); err == nil {
 				currentErr := models.Error{Message: fmt.Sprintf("This email is already registered by user: %s", nickname)}
 				return operations.NewUserUpdateConflict().WithPayload(&currentErr)
+			} else {
+				log.Println(err)
 			}
 
-			eUser.Email = params.Profile.Email
+			tempUser.Email = params.Profile.Email
 			args = append(args, params.Profile.Email)
-			query += fmt.Sprintf(" email = $%d", len(args))
+			queryParams = append(queryParams, fmt.Sprintf("email = $%d", len(args)))
+
 		}
 
 		if params.Profile.About != "" {
-			eUser.About = params.Profile.About
+			tempUser.About = params.Profile.About
 			args = append(args, params.Profile.About)
-			query += fmt.Sprintf(" about = $%d", len(args))
+			queryParams = append(queryParams, fmt.Sprintf("about = $%d", len(args)))
 		}
+	} else {
+		return operations.NewUserUpdateOK().WithPayload(&tempUser)
 	}
 
 	args = append(args, params.Nickname)
-	query += fmt.Sprintf(" where nickname = $%d", len(args))
+	query += strings.Join(queryParams, ",") + fmt.Sprintf(" where nickname = $%d", len(args)) + " returning nickname, fullname, about, email"
 
-	if _, err := tx.Exec(query, args...); err != nil {
+	if err := tx.QueryRow(query, args...).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
 		log.Println(err)
 	}
 
@@ -116,5 +122,5 @@ func (self HandlerDB) UserUpdate(params operations.UserUpdateParams) middleware.
 		log.Println(err)
 	}
 
-	return operations.NewUserCreateCreated().WithPayload(&eUser)
+	return operations.NewUserUpdateOK().WithPayload(&tempUser)
 }
