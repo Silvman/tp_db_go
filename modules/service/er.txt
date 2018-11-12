@@ -1,0 +1,156 @@
+2018/11/12 13:49:12 - begin -----
+2018/11/12 13:49:12 /api/thread/5000/posts?desc=true&limit=17&sort=flat
+2018/11/12 13:49:12 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint order by id desc limit $2
+2018/11/12 13:49:12 - end -------
+2018/11/12 13:49:12 - begin -----
+2018/11/12 13:49:12 /api/thread/5001/posts?desc=false&limit=16&sort=flat
+2018/11/12 13:49:12 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint order by id limit $2
+2018/11/12 13:49:12 - end -------
+2018/11/12 13:49:12 - begin -----
+2018/11/12 13:49:12 /api/thread/5001/posts?desc=true&limit=15&since=749925&sort=tree
+2018/11/12 13:49:12 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id where mPath < (select mPath from posts_tree_b where id = $2)  order by mPath[1] desc, mPath desc limit $3
+2018/11/12 13:49:12 - end -------
+2018/11/12 13:49:15 - begin -----
+2018/11/12 13:49:15 /api/thread/4990/posts?desc=false&limit=18&since=749840&sort=flat
+2018/11/12 13:49:15 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint and id > $2 order by id limit $3
+2018/11/12 13:49:15 - end -------
+2018/11/12 13:49:16 - begin -----
+2018/11/12 13:49:16 /api/thread/5000/posts?limit=16&sort=tree
+2018/11/12 13:49:16 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1], mPath limit $2
+2018/11/12 13:49:16 - end -------
+2018/11/12 13:49:17 - begin -----
+2018/11/12 13:49:17 /api/thread/5000/posts?limit=15&sort=tree
+2018/11/12 13:49:17 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1], mPath limit $2
+2018/11/12 13:49:17 - end -------
+2018/11/12 13:49:19 - begin -----
+2018/11/12 13:49:19 /api/thread/5000/posts?desc=false&limit=18&sort=flat
+2018/11/12 13:49:19 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint order by id limit $2
+2018/11/12 13:49:19 - end -------
+2018/11/12 13:49:19 - begin -----
+2018/11/12 13:49:19 /api/thread/7268/posts?desc=true&limit=17&sort=tree
+2018/11/12 13:49:19 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1] desc, mPath desc limit $2
+2018/11/12 13:49:19 - end -------
+2018/11/12 13:49:20 - begin -----
+2018/11/12 13:49:20 /api/thread/6443/posts?limit=19&sort=flat
+2018/11/12 13:49:20 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint order by id limit $2
+2018/11/12 13:49:20 - end -------
+2018/11/12 13:49:22 - begin -----
+2018/11/12 13:49:22 /api/thread/4481/posts?desc=false&limit=16&since=671613&sort=tree
+2018/11/12 13:49:22 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id where mPath > (select mPath from posts_tree_b where id = $2)  order by mPath[1], mPath limit $3
+2018/11/12 13:49:22 - end -------
+2018/11/12 13:49:22 - begin -----
+2018/11/12 13:49:22 /api/thread/5000/posts?desc=true&limit=19&sort=tree
+2018/11/12 13:49:22 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1] desc, mPath desc limit $2
+2018/11/12 13:49:22 - end -------
+2018/11/12 13:49:23 - begin -----
+2018/11/12 13:49:23 /api/thread/5001/posts?desc=false&limit=17&since=1041853&sort=parent_tree
+2018/11/12 13:49:23 select rr.id, parent, message, isEdit, forum, created, thread, author from (
+                with recursive posts_tree (id, mPath) as (
+                        select
+                        id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+union all
+                        select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree as pt on pt.id = p.parent
+                ) select mPath, posts_tree.id as id, dense_rank() over (order by mPath[1]) as r from posts_tree  where mPath[1] > (select mPath[1] from posts_tree where id = $2) ) as rr join posts on rr.id = posts.id where r <= $3 order by mPath[1], mPath
+2018/11/12 13:49:23 - end -------
+2018/11/12 13:49:28 - begin -----
+2018/11/12 13:49:28 /api/thread/5001/posts?desc=true&limit=18&sort=tree
+2018/11/12 13:49:28 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1] desc, mPath desc limit $2
+2018/11/12 13:49:28 - end -------
+2018/11/12 13:49:31 - begin -----
+2018/11/12 13:49:31 /api/thread/4878/posts?desc=false&limit=19&since=731475&sort=parent_tree
+2018/11/12 13:49:31 select rr.id, parent, message, isEdit, forum, created, thread, author from (
+                with recursive posts_tree (id, mPath) as (
+                        select
+                        id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+union all
+                        select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree as pt on pt.id = p.parent
+                ) select mPath, posts_tree.id as id, dense_rank() over (order by mPath[1]) as r from posts_tree  where mPath[1] > (select mPath[1] from posts_tree where id = $2) ) as rr join posts on rr.id = posts.id where r <= $3 order by mPath[1], mPath
+2018/11/12 13:49:31 - end -------
+2018/11/12 13:49:31 - begin -----
+2018/11/12 13:49:31 /api/thread/5000/posts?desc=false&limit=19&sort=flat
+2018/11/12 13:49:31 select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint order by id limit $2
+2018/11/12 13:49:31 - end -------
+2018/11/12 13:49:34 - begin -----
+2018/11/12 13:49:34 /api/thread/5001/posts?desc=true&limit=19&sort=tree
+2018/11/12 13:49:34 with recursive posts_tree_b (id, mPath) as (
+                select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+                union all
+                select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree_b as pt on pt.id = p.parent
+                )
+                select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
+                join posts p on posts_tree_b.id = p.id order by mPath[1] desc, mPath desc limit $2
+2018/11/12 13:49:34 - end -------
+2018/11/12 13:49:34 - begin -----
+2018/11/12 13:49:34 /api/thread/5000/posts?limit=16&sort=parent_tree
+2018/11/12 13:49:34 select rr.id, parent, message, isEdit, forum, created, thread, author from (
+                with recursive posts_tree (id, mPath) as (
+                        select
+                        id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+union all
+                        select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree as pt on pt.id = p.parent
+                ) select mPath, posts_tree.id as id, dense_rank() over (order by mPath[1]) as r from posts_tree ) as rr join posts on rr.id = posts.id where r <= $2 order by mPath[1], mPath
+2018/11/12 13:49:34 - end -------
+2018/11/12 13:49:44 - begin -----
+2018/11/12 13:49:44 /api/thread/_5XeuYeZtB1XK/posts?desc=true&limit=16&sort=parent_tree
+2018/11/12 13:49:44 select rr.id, parent, message, isEdit, forum, created, thread, author from (
+                with recursive posts_tree (id, mPath) as (
+                        select
+                        id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
+union all
+                        select p.id, array_append(mPath, p.id) from posts p
+                        join posts_tree as pt on pt.id = p.parent
+                ) select mPath, posts_tree.id as id, dense_rank() over (order by mPath[1] desc) as r from posts_tree ) as rr join posts on rr.id = posts.id where r <= $2 order by mPath[1] desc, mPath
+2018/11/12 13:49:44 - end -------

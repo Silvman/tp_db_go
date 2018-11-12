@@ -7,7 +7,6 @@ create table users (
 
   constraint  email_unique unique(email)
 );
-create unique index uniq_nickname on users(nickname);
 
 create table forums (
   slug        citext primary key,
@@ -16,7 +15,6 @@ create table forums (
   posts       bigint default 0,
   threads     bigint default 0
 );
-create unique index uniq_slug on forums(slug);
 
 create table threads (
   id          bigserial primary key,
@@ -34,7 +32,8 @@ create table threads (
 create table posts (
   id          bigserial primary key,
   parent      bigint default 0,
---   parents     bigint[],
+--   rootParent  bigint default 0,
+  mPath       bigint[],
   message     text not null,
   isEdit      boolean default false,
   forum       citext references forums(slug),
@@ -50,6 +49,13 @@ create table votes (
 
   constraint  author_thread_unique unique(author, thread)
 );
+
+create index on threads (created);
+create index on votes (thread);
+create index on posts (parent);
+create index on posts (thread);
+-- create index on posts (mPath);
+-- create index on posts(rootParent);
 
 
 create or replace function recount_votes() returns trigger as $$
@@ -71,6 +77,17 @@ begin
 end;
 $$ language plpgsql;
 
+create or replace function posts_build_path() returns trigger as $$
+begin
+  if new.parent = 0 then
+    update posts set mPath = array_append('{}'::bigint[], id) where id = new.id;
+  else
+    update posts set mPath = array_append((select mPath from posts where id = new.parent), id) where id = new.id;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
 create trigger recount_votes_trigger
   after insert or update on votes
   for each row execute procedure recount_votes();
@@ -82,3 +99,7 @@ create trigger new_post_trigger
 create trigger new_thread_trigger
   after insert on threads
   for each row execute procedure inc_counters();
+
+create trigger posts_build_path_trigger
+  after insert on posts
+  for each row execute procedure posts_build_path();

@@ -7,7 +7,6 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/jackc/pgx/pgtype"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -15,9 +14,11 @@ import (
 func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	//log.Println("thread_create")
 
 	var slug string
 	if err := tx.QueryRow("select slug from forums where slug = $1", params.Slug).Scan(&slug); err != nil {
@@ -31,10 +32,20 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 		return operations.NewThreadCreateNotFound().WithPayload(&currentErr)
 	}
 
+	argsC := []interface{}{}
+	argsC = append(argsC, params.Thread.Title, params.Slug, params.Thread.Message)
+
+	queryConflict := "select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))"
+
+	if params.Thread.Slug != "" {
+		queryConflict += " or (slug = $4)"
+		argsC = append(argsC, params.Thread.Slug)
+	}
+
 	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
-	if err := tx.QueryRow(`select id, title, message, votes, slug, created, forum, author from threads where (title = $1 and forum = $2) or (slug = $3)`, params.Thread.Title, params.Slug, params.Thread.Slug).
+	if err := tx.QueryRow(queryConflict, argsC...).
 		Scan(
 			&eThread.ID,
 			&eThread.Title,
@@ -54,7 +65,7 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 		eThread.Created = &t
 		return operations.NewThreadCreateConflict().WithPayload(&eThread)
 	} else {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	args := []interface{}{}
@@ -103,7 +114,7 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewThreadCreateCreated().WithPayload(&newThread)
@@ -112,7 +123,7 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 func (self HandlerDB) ThreadGetOne(params operations.ThreadGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -155,7 +166,7 @@ func (self HandlerDB) ThreadGetOne(params operations.ThreadGetOneParams) middlew
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewThreadGetOneOK().WithPayload(&eThread)
@@ -164,7 +175,7 @@ func (self HandlerDB) ThreadGetOne(params operations.ThreadGetOneParams) middlew
 func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -221,21 +232,14 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 
 	case "tree":
 		{
-			query = `with recursive posts_tree_b (id, mPath) as (
-    		select id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
-		union all
-    		select p.id, array_append(mPath, p.id) from posts p
-  			join posts_tree_b as pt on pt.id = p.parent
-		)
-		select posts_tree_b.id as id, parent, message, isEdit, forum, created, thread, author from posts_tree_b
-		join posts p on posts_tree_b.id = p.id`
+			query = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1::bigint`
 
 			if params.Since != nil {
 				args = append(args, *params.Since)
 				if params.Desc != nil && *params.Desc {
-					query += fmt.Sprintf(" where mPath < (select mPath from posts_tree_b where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and mPath < (select mPath from posts where id = $%d) ", len(args))
 				} else {
-					query += fmt.Sprintf(" where mPath > (select mPath from posts_tree_b where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and mPath > (select mPath from posts where id = $%d) ", len(args))
 				}
 			}
 
@@ -253,36 +257,31 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 
 	case "parent_tree":
 		{
-			query = `select rr.id, parent, message, isEdit, forum, created, thread, author from (
-		with recursive posts_tree (id, mPath) as (
-    			select
-    			id, array_append('{}'::bigint[], id) as mArray from posts where parent = 0 and thread = $1
-union all
-  			select p.id, array_append(mPath, p.id) from posts p
-  			join posts_tree as pt on pt.id = p.parent
-		) select mPath, posts_tree.id as id, dense_rank() over (order by mPath[1]`
-
-			if params.Desc != nil && *params.Desc {
-				query += " desc"
-			}
-
-			query += `) as r from posts_tree `
+			query = `select id, parent, message, isEdit, forum, created, thread, author
+			from posts where mPath[1] in
+			(select id from posts where thread = $1::bigint and parent = 0`
 
 			if params.Since != nil {
 				args = append(args, *params.Since)
 				if params.Desc != nil && *params.Desc {
-					query += fmt.Sprintf(" where mPath[1] < (select mPath[1] from posts_tree where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and id < (select mPath[1] from posts where id = $%d) ", len(args))
 				} else {
-					query += fmt.Sprintf(" where mPath[1] > (select mPath[1] from posts_tree where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and id > (select mPath[1] from posts where id = $%d) ", len(args))
 				}
 			}
 
-			query += `) as rr join posts on rr.id = posts.id where`
+			if params.Desc != nil && *params.Desc {
+				query += " order by id desc"
+			} else {
+				query += " order by id"
+			}
 
 			if params.Limit != nil {
 				args = append(args, *params.Limit)
-				query += fmt.Sprintf(" r <= $%d", len(args))
+				query += fmt.Sprintf(" limit $%d", len(args))
 			}
+
+			query += `)`
 
 			if params.Desc != nil && *params.Desc {
 				query += " order by mPath[1] desc, mPath"
@@ -292,23 +291,28 @@ union all
 		}
 	}
 
-	log.Println(query)
+	//log.Println("- begin -----");
+	//log.Println(params.HTTPRequest.URL);
+	//log.Println(query);
+	//log.Println("- end -------");
+
+	//log.Println(query)
 	rows, err := tx.Query(query, args...)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
-	log.Printf("%#v\n", rows)
+	//log.Printf("%#v\n", rows)
 
 	fetchPosts := models.Posts{}
 	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
-		log.Printf("fit\n")
+		//log.Printf("fit\n")
 		post := models.Post{}
 		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &pgTime, &post.Thread, &post.Author)
 		if err != nil {
-			log.Println(err)
+			//log.Println(err)
 		}
 
 		if pgSlug.Status != pgtype.Null {
@@ -324,7 +328,7 @@ union all
 	}
 
 	if err = tx.Commit(); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewThreadGetPostsOK().WithPayload(fetchPosts)
@@ -333,9 +337,11 @@ union all
 func (self HandlerDB) ThreadUpdate(params operations.ThreadUpdateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	//log.Println("thread_update")
 
 	query := "select id from threads where"
 	currentErr := models.Error{}
@@ -387,7 +393,7 @@ func (self HandlerDB) ThreadUpdate(params operations.ThreadUpdateParams) middlew
 		&updThread.Forum,
 		&updThread.Author,
 	); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	if pgSlug.Status != pgtype.Null {
@@ -399,7 +405,7 @@ func (self HandlerDB) ThreadUpdate(params operations.ThreadUpdateParams) middlew
 	updThread.Created = &t
 
 	if err = tx.Commit(); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewThreadUpdateOK().WithPayload(&updThread)
@@ -408,9 +414,11 @@ func (self HandlerDB) ThreadUpdate(params operations.ThreadUpdateParams) middlew
 func (self HandlerDB) ThreadVote(params operations.ThreadVoteParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	//log.Println("vote")
 
 	query := "select id from threads where"
 	currentErr := models.Error{}
@@ -428,7 +436,7 @@ func (self HandlerDB) ThreadVote(params operations.ThreadVoteParams) middleware.
 	}
 
 	if _, err := tx.Exec("insert into votes (author, thread, vote) values ($1, $2, $3) on conflict (author, thread) do update set vote = $3", params.Vote.Nickname, tId, params.Vote.Voice); err != nil {
-		log.Println(err)
+		//log.Println(err)
 		currentErr.Message = fmt.Sprintf("Can't find user by nickname: %s", params.Vote.Nickname)
 		return operations.NewThreadVoteNotFound().WithPayload(&currentErr)
 	}
@@ -447,7 +455,7 @@ func (self HandlerDB) ThreadVote(params operations.ThreadVoteParams) middleware.
 			&updThread.Forum,
 			&updThread.Author,
 		); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	if pgSlug.Status != pgtype.Null {
@@ -459,7 +467,7 @@ func (self HandlerDB) ThreadVote(params operations.ThreadVoteParams) middleware.
 	updThread.Created = &t
 
 	if err = tx.Commit(); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewThreadUpdateOK().WithPayload(&updThread)

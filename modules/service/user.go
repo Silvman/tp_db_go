@@ -12,9 +12,11 @@ import (
 func (self HandlerDB) UserCreate(params operations.UserCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	log.Println("user_create")
 
 	rows, _ := tx.Query(`select nickname, fullname, about, email from users where nickname = $1 or email = $2`, params.Nickname, params.Profile.Email)
 	eUsers := models.Users{}
@@ -31,7 +33,7 @@ func (self HandlerDB) UserCreate(params operations.UserCreateParams) middleware.
 	tx.Exec(`insert into users values ($1, $2, $3, $4)`, params.Nickname, params.Profile.Fullname, params.Profile.About, params.Profile.Email)
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	params.Profile.Nickname = params.Nickname
@@ -42,7 +44,7 @@ func (self HandlerDB) UserCreate(params operations.UserCreateParams) middleware.
 func (self HandlerDB) UserGetOne(params operations.UserGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -55,7 +57,7 @@ func (self HandlerDB) UserGetOne(params operations.UserGetOneParams) middleware.
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewUserGetOneOK().WithPayload(&eUser)
@@ -64,9 +66,11 @@ func (self HandlerDB) UserGetOne(params operations.UserGetOneParams) middleware.
 func (self HandlerDB) UserUpdate(params operations.UserUpdateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	log.Println("user_update")
 
 	tempUser := models.User{}
 	if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, params.Nickname).
@@ -92,7 +96,7 @@ func (self HandlerDB) UserUpdate(params operations.UserUpdateParams) middleware.
 				currentErr := models.Error{Message: fmt.Sprintf("This email is already registered by user: %s", nickname)}
 				return operations.NewUserUpdateConflict().WithPayload(&currentErr)
 			} else {
-				log.Println(err)
+				//log.Println(err)
 			}
 
 			tempUser.Email = params.Profile.Email
@@ -114,12 +118,12 @@ func (self HandlerDB) UserUpdate(params operations.UserUpdateParams) middleware.
 	query += strings.Join(queryParams, ",") + fmt.Sprintf(" where nickname = $%d", len(args)) + " returning nickname, fullname, about, email"
 
 	if err := tx.QueryRow(query, args...).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	return operations.NewUserUpdateOK().WithPayload(&tempUser)

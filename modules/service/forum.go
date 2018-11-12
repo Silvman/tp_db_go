@@ -7,7 +7,6 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/jackc/pgx/pgtype"
-	"log"
 )
 
 const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug=$1`
@@ -33,9 +32,11 @@ func (self HandlerDB) () middleware.Responder {
 func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
+
+	//log.Println("forum_create")
 
 	forumExisting := models.Forum{}
 
@@ -58,7 +59,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 
 	if err := tx.QueryRow(qInsertForum, params.Forum.Slug, params.Forum.Title, nickname).
 		Scan(&params.Forum.User); err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	tx.Commit()
@@ -68,7 +69,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -93,7 +94,7 @@ func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middlewar
 func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -136,7 +137,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 		thread := models.Thread{}
 		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &pgTime, &thread.Forum, &thread.Author)
 		if err != nil {
-			log.Println(err)
+			//log.Println(err)
 		}
 
 		if pgSlug.Status != pgtype.Null {
@@ -158,7 +159,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		//log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -204,11 +205,11 @@ func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middl
 
 	query := qOuter + qSelectUserThreads + " union " + qSelectUserPosts + " " + qJoin + qOuterClose
 
-	log.Println(query)
+	//log.Println(query)
 
 	rows, err := tx.Query(query, args...)
 
-	log.Println(err)
+	//log.Println(err)
 
 	existingUsers := models.Users{}
 
