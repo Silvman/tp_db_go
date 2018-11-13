@@ -1,0 +1,52 @@
+16410	16411	1002738870	"select u.nickname, fullname, about, email from forums_users
+join users u on forums_users.id = u.id
+where forum = $1 order by u.nickname limit $2"	11993	3864.1104719999935	0.261212	1.82518	0.32219715434003154	0.04490740717325163	203814	648012	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	3179213953	select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created <= $2::timestamptz order by created desc limit $3	5994	4379.355061000019	0.016522	2.562946	0.7306231332999685	0.21905873290661304	99819	1540673	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2023140319	"select u.nickname, fullname, about, email from forums_users
+join users u on forums_users.id = u.id
+where forum = $1 order by u.nickname desc limit $2"	5975	1944.5850449999937	0.262405	1.813182	0.32545356401673586	0.04695613546693861	101576	334919	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	584095119	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by rootParent, mPath limit $2	4296	1184.985682000001	0.010817	10.391693	0.27583465595903167	0.3709744596548586	63358	148832	24382	0	0	0	0	0	0	0	0	0	0
+16410	16411	446336186	select nickname, fullname, about, email from users where nickname = $1	57473	1731.159892999989	0.014291	1.1526869999999998	0.030121272475771385	0.012759713095521003	53811	169209	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	720160562	SELECT typinput=$2::regproc, typtype   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas($3))[s.r] as nspname                    from generate_series($4, array_upper(current_schemas($5), $6)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT $7	1	0.09768399999999999	0.09768399999999999	0.09768399999999999	0.09768399999999999	0	1	2	2	0	0	0	0	0	0	0	0	0	0
+16410	16411	3382121570	"select id, parent, message, isEdit, forum, created, thread, author
+			from posts where rootParent in
+			(select id from posts where thread = $1 and parent = $4 and id < (select rootParent from posts where id = $2)  order by id desc limit $3) order by rootParent desc, mPath"	1813	539.1155020000001	0.09011999999999999	10.231022	0.2973610049641473	0.44789456253190757	33267	199221	13215	0	0	0	0	0	0	0	0	0	0
+16410	16411	1615503871	select id from threads where id = $1	37632	397.50889800000095	0.004442	0.5364840000000001	0.010563055325255146	0.0046331379522773	34969	110314	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	3194152589	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by rootParent desc, mPath desc limit $2	2147	552.0037350000009	0.011441999999999999	10.530473	0.2571046739636697	0.35520962376362114	31755	73836	13432	0	0	0	0	0	0	0	0	0	0
+16410	16411	1115372308	"select id, parent, message, isEdit, forum, created, thread, author
+			from posts where rootParent in
+			(select id from posts where thread = $1 and parent = $4 and id > (select rootParent from posts where id = $2)  order by id limit $3) order by rootParent, mPath"	3607	1016.746337999998	0.080487	8.097488	0.28188143554200146	0.26619228650880716	65755	396046	25899	0	0	0	0	0	0	0	0	0	0
+16410	16411	717191940	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath < (select mPath from posts where id = $2)  order by rootParent desc, mPath desc limit $3	1876	608.3719190000006	0.082469	11.581408	0.32429206769722824	0.6424607399882996	30459	81060	13236	0	0	0	0	0	0	0	0	0	0
+16410	16411	760725273	"select u.nickname, fullname, about, email from forums_users
+join users u on forums_users.id = u.id
+where forum = $1 and u.nickname < $2 order by u.nickname desc limit $3"	6029	3039.570568999998	0.015985	2.430006	0.5041583295737266	0.2375268146057006	101434	313619	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	4008201283	SELECT n.nspname = ANY(current_schemas($2)), n.nspname, t.typname FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1	1	0.051533999999999996	0.051533999999999996	0.051533999999999996	0.051533999999999996	0	1	3	1	0	0	0	0	0	0	0	0	0	0
+16410	16411	3584091649	select slug from forums where slug = $1	79114	1666.7955009999773	0.009037	1.54396	0.021068274907095983	0.011099666332094122	71917	280373	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	3640641642	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id desc limit $2	2152	526.2157159999994	0.010350999999999999	12.073423	0.24452403159851285	0.41646715807898643	32103	76381	13212	0	0	0	0	0	0	0	0	0	0
+16410	16411	2117679748	select slug, title, posts, threads, owner from forums where slug = $1	57433	1411.453997000003	0.009795	1.8971310000000001	0.02457566202357551	0.011889758696558509	53845	199230	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2634585715	select current_database() as a, current_schemas($1) as b	1	0.012923	0.012923	0.012923	0.012923	0	1	0	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	1824353176	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id < $2 order by id desc limit $3	1835	400.8971880000001	0.06187800000000001	12.050087	0.21847258201634912	0.4012801140440934	29694	73007	11742	0	0	0	0	0	0	0	0	0	0
+16410	16411	4248430099	"select id, parent, message, isEdit, forum, created, thread, author
+			from posts where rootParent in
+			(select id from posts where thread = $1 and parent = $3 order by id desc limit $2) order by rootParent desc, mPath"	2099	547.573742999999	0.012408	15.263964	0.26087362696522154	0.6162828913800806	30721	194590	12343	0	0	0	0	0	0	0	0	0	0
+16410	16411	1868163425	commit	250998	134.3927260000015	0.000236	0.616499	0.0005354334536530028	0.0013498993826111475	0	0	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2193432627	select id from threads where slug = $1	1882	49.82514299999985	0.018195000000000003	0.39637	0.026474571200850172	0.01080689732623803	998	4768	7	0	0	0	0	0	0	0	0	0	0
+16410	16411	3032734150	"select u.nickname, fullname, about, email from forums_users
+join users u on forums_users.id = u.id
+where forum = $1 and u.nickname > $2 order by u.nickname limit $3"	11982	5978.728851999997	0.010686000000000001	7.896938	0.49897586813553596	0.23324090026644193	201894	624078	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	9242100	"select id, parent, message, isEdit, forum, created, thread, author
+			from posts where rootParent in
+			(select id from posts where thread = $1 and parent = $3 order by id limit $2) order by rootParent, mPath"	4337	1184.043761999999	0.012211999999999999	13.262417000000001	0.27300985981093	0.4056452706552907	82269	427986	26527	0	0	0	0	0	0	0	0	0	0
+16410	16411	2792803450	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id limit $2	4343	1092.3916320000003	0.011063	10.803349	0.2515292728528671	0.409225486399673	63251	148669	24955	0	0	0	0	0	0	0	0	0	0
+16410	16411	2547321500	SELECT pg_stat_statements_reset()	1	0.186736	0.186736	0.186736	0.186736	0	1	0	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2111245140	begin	276215	177.66296199999599	0.000238	0.258025	0.0006432053364227182	0.001045773434427466	0	0	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2662461760	select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created limit $2	11890	7335.365600000008	0.248985	2.584916	0.6169357106812479	0.1653942981731593	201958	4106833	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	1301163571	select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1	39617	891.9132560000079	0.005539	2.473048	0.022513397177979136	0.031564101282318215	35981	138325	16685	0	0	0	0	0	0	0	0	0	0
+16410	16411	2717532450	rollback	25217	16.094964999999952	0.000283	0.166084	0.0006382585160804184	0.0010962546150679446	0	0	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	2746943718	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath > (select mPath from posts where id = $2)  order by rootParent, mPath limit $3	3768	1148.9164100000016	0.085624	9.584726999999999	0.3049141215498931	0.39725606897109816	61025	162242	26374	0	0	0	0	0	0	0	0	0	0
+16410	16411	2257638489	select id, title, message, votes, slug, created, forum, author from threads where id = $1::bigint	55296	894.5651280000005	0.004259000000000001	0.863218	0.016177754774305653	0.008670678298095579	52566	163295	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	3400998	select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created >= $2::timestamptz order by created limit $3	12073	8836.983576999988	0.006975	2.6456600000000003	0.7319625260498671	0.21547460113246536	201912	3083258	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	736866452	select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created desc limit $2	5981	3633.0648460000107	0.311978	2.059811	0.6074343497742836	0.12392039806121477	101281	2007189	0	0	0	0	0	0	0	0	0	0	0
+16410	16411	4230810799	select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id > $2 order by id limit $3	3694	872.4014729999992	0.058487	9.519879999999999	0.23616715565782354	0.3617471122072954	59716	147943	23859	0	0	0	0	0	0	0	0	0	0
+16410	16411	3313869790	select id, title, message, votes, slug, created, forum, author from threads where slug = $1	1798	51.36080899999999	0.018226000000000003	0.14646	0.02856552224694108	0.005868537717850534	941	4534	6	0	0	0	0	0	0	0	0	0	0
+16410	16411	254487369	SHOW TRANSACTION ISOLATION LEVEL	1	0.005615	0.005615	0.005615	0.005615	0	0	0	0	0	0	0	0	0	0	0	0	0	0

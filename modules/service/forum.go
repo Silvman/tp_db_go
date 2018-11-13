@@ -7,6 +7,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/jackc/pgx/pgtype"
+	"log"
 )
 
 const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug=$1`
@@ -32,11 +33,11 @@ func (self HandlerDB) () middleware.Responder {
 func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
-	//log.Println("forum_create")
+	log.Println("forum_create")
 
 	forumExisting := models.Forum{}
 
@@ -59,7 +60,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 
 	if err := tx.QueryRow(qInsertForum, params.Forum.Slug, params.Forum.Title, nickname).
 		Scan(&params.Forum.User); err != nil {
-		//log.Println(err)
+		log.Println(err)
 	}
 
 	tx.Commit()
@@ -69,7 +70,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -94,7 +95,7 @@ func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middlewar
 func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -137,7 +138,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 		thread := models.Thread{}
 		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &pgTime, &thread.Forum, &thread.Author)
 		if err != nil {
-			//log.Println(err)
+			log.Println(err)
 		}
 
 		if pgSlug.Status != pgtype.Null {
@@ -159,7 +160,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
@@ -172,44 +173,43 @@ func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middl
 	args := []interface{}{}
 	args = append(args, params.Slug)
 
-	qOuter := `select nickname, fullname, about, email from users where nickname in (`
-	qSelectUserThreads := `select distinct (author) from threads where forum = $1`
-	qSelectUserPosts := `select distinct (p.author) from posts p`
-	qJoin := `join threads t on p.thread = t.id where t.forum = $1`
-	qOuterClose := `) order by nickname`
+	//qOuter := `select nickname, fullname, about, email from users where nickname in (`
+	//qSelectUserThreads := `select distinct (author) from threads where forum = $1`
+	//qSelectUserPosts := `select distinct (p.author) from posts p`
+	//qJoin := `join threads t on p.thread = t.id where t.forum = $1`
+	//qOuterClose := `) order by nickname`
+
+	query := `select u.nickname, fullname, about, email from forums_users
+join users u on forums_users.id = u.id
+where forum = $1`
 
 	if params.Since != nil {
 		if params.Desc != nil && *params.Desc {
 			args = append(args, *params.Since)
-			qSelectUserThreads += fmt.Sprintf(" and author < $%d", len(args))
-			qJoin += fmt.Sprintf(" and p.author < $%d", len(args))
+			query += fmt.Sprintf(" and u.nickname < $%d", len(args))
 		} else {
 			args = append(args, *params.Since)
-			qSelectUserThreads += fmt.Sprintf(" and author > $%d", len(args))
-			qJoin += fmt.Sprintf(" and p.author > $%d", len(args))
+			query += fmt.Sprintf(" and u.nickname > $%d", len(args))
 		}
 	}
 
+	query += " order by u.nickname"
+
 	if params.Desc != nil {
 		if *params.Desc {
-			qOuterClose += " desc"
-		} else {
-			qOuterClose += " asc"
+			query += " desc"
 		}
 	}
 
 	if params.Limit != nil {
 		args = append(args, *params.Limit)
-		qOuterClose += fmt.Sprintf(" limit $%d", len(args))
+		query += fmt.Sprintf(" limit $%d", len(args))
 	}
-
-	query := qOuter + qSelectUserThreads + " union " + qSelectUserPosts + " " + qJoin + qOuterClose
-
-	//log.Println(query)
+	log.Println(query)
 
 	rows, err := tx.Query(query, args...)
 
-	//log.Println(err)
+	log.Println(err)
 
 	existingUsers := models.Users{}
 

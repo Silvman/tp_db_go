@@ -4,22 +4,23 @@ import (
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/Silvman/tech-db-forum/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
+	"log"
 )
 
 func (self HandlerDB) Clear(params operations.ClearParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`truncate table votes, users, forums, threads, posts`); err != nil {
-		//log.Println(err)
+	if _, err := tx.Exec(`truncate table votes, forums_users, users, forums, threads, posts`); err != nil {
+		log.Println(err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		//log.Println(err)
+		log.Println(err)
 	}
 
 	return operations.NewClearOK()
@@ -28,11 +29,11 @@ func (self HandlerDB) Clear(params operations.ClearParams) middleware.Responder 
 func (self HandlerDB) Status(params operations.StatusParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		//log.Fatalln(err)
+		log.Fatalln(err)
 	}
 	defer tx.Rollback()
 
-	//log.Println("status")
+	log.Println("status")
 
 	status := models.Status{}
 	tx.QueryRow("select count(*) from users").Scan(&status.User)
@@ -42,7 +43,7 @@ func (self HandlerDB) Status(params operations.StatusParams) middleware.Responde
 
 	err = tx.Commit()
 	if err != nil {
-		//log.Println(err)
+		log.Println(err)
 	}
 
 	return operations.NewStatusOK().WithPayload(&status)
