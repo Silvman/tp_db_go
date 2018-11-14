@@ -180,7 +180,7 @@ func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middl
 	//qOuterClose := `) order by nickname`
 
 	query := `select u.nickname, fullname, about, email from forums_users
-join users u on forums_users.id = u.id
+join users u on forums_users.uid = u.id
 where forum = $1`
 
 	if params.Since != nil {

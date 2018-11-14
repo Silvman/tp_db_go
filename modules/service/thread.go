@@ -102,7 +102,7 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 			&newThread.Forum,
 			&newThread.Author,
 		); err != nil {
-
+		log.Println(err)
 	}
 
 	t := strfmt.NewDateTime()
@@ -122,6 +122,7 @@ func (self HandlerDB) ThreadCreate(params operations.ThreadCreateParams) middlew
 }
 
 func (self HandlerDB) ThreadGetOne(params operations.ThreadGetOneParams) middleware.Responder {
+	self.checkVacuum()
 	tx, err := self.pool.Begin()
 	if err != nil {
 		log.Fatalln(err)

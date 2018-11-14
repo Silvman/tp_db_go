@@ -30,7 +30,11 @@ func (self HandlerDB) UserCreate(params operations.UserCreateParams) middleware.
 		return operations.NewUserCreateConflict().WithPayload(eUsers)
 	}
 
-	tx.Exec(`insert into users values ($1, $2, $3, $4)`, params.Nickname, params.Profile.Fullname, params.Profile.About, params.Profile.Email)
+	_, err = tx.Exec(`insert into users values ($1, $2, $3, $4)`, params.Nickname, params.Profile.Fullname, params.Profile.About, params.Profile.Email)
+	if err != nil {
+		log.Println(err)
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		log.Println(err)

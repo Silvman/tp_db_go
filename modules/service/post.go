@@ -197,6 +197,7 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	}
 
 	if len(params.Posts) == 0 {
+		log.Println("nilPosts")
 		return operations.NewPostsCreateCreated().WithPayload(params.Posts)
 	}
 

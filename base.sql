@@ -1,14 +1,13 @@
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-SELECT pg_stat_statements_reset();
-
 create extension if not exists citext;
 create table users (
   nickname    citext collate "ucs_basic" primary key,
   fullname    text default '',
   about       text default '',
   email       citext not null,
+  id          bigserial,
 
-  constraint  email_unique unique(email)
+  constraint  email_unique unique(email),
+  constraint  users_id_uniq unique(id)
 );
 
 create table forums (
@@ -20,35 +19,15 @@ create table forums (
 );
 
 create table forums_users (
-  forum       citext references forums(slug),
-  nickname    citext references users(nickname),
+  forum       citext collate "ucs_basic" references forums(slug),
+  uid         bigserial references users(id),
 
-  constraint  forum_nick_unique unique(forum, nickname)
+  constraint  forum_uid_unique unique(forum, uid)
 );
 
-alter table forums_users alter column forum TYPE citext collate "ucs_basic";
-alter table forums_users alter column nickname TYPE citext collate "ucs_basic";
-
-alter table forums_users add  column id BIGINT references users(id);
-
-update forums_users set id = (select id from users where users.nickname = forums_users.nickname);
-
-alter table forums_users drop constraint forum_nick_unique;
-
-alter table forums_users drop column nickname;
-
-alter table forums_users add constraint forum_id_unique unique(forum, id);
-
-
-alter table users add column id BIGSERIAL;
-alter table users add constraint users_id_uniq unique (id);
-
-create index on users(id);
-
-select * from forums_users;
-
+-- ?
+create index on forums_users(uid);
 create index on forums_users(forum);
-create index on forums_users(id);
 
 
 create table threads (
@@ -88,7 +67,9 @@ create table votes (
 create index on threads (created);
 create index on threads (forum);
 create index on threads (author);
+
 create index on votes (thread);
+
 create index on posts (parent);
 create index on posts (thread);
 create index on posts (author);
@@ -97,7 +78,7 @@ create index on posts(rootParent);
 
 create or replace function establish_forum_users() returns trigger as $$
 begin
-  insert into forums_users (forum, nickname) values (new.forum, new.author) on conflict do nothing;
+  insert into forums_users (forum, uid) values (new.forum, (select id from users where nickname = new.author)) on conflict do nothing;
   return new;
 end;
 $$ language plpgsql;
@@ -134,7 +115,7 @@ begin
         rootParent = (select rootParent from posts where id = new.parent)
     where id = new.id;
   end if;
-  insert into forums_users (forum, nickname) values (new.forum, new.author) on conflict do nothing;
+  insert into forums_users (forum, uid) values (new.forum, (select id from users where nickname = new.author)) on conflict do nothing;
   return new;
 end;
 $$ language plpgsql;
@@ -154,10 +135,6 @@ create trigger new_thread_trigger
 create trigger posts_build_path_trigger
   after insert on posts
   for each row execute procedure posts_build_path();
-
-create trigger establish_forum_users_trigger
-  after insert on posts
-  for each row execute procedure establish_forum_users();
 
 create trigger establish_forum_users_threads_trigger
   after insert on threads
