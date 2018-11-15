@@ -45,10 +45,8 @@ func NewHandler() (*HandlerDB, error) {
 	return handler, err
 }
 
-func check(err error) {
-	if err != nil {
-		log.Panic(err)
-	}
+func check(err interface{}) {
+	//log.Println(err)
 }
 
 func (self *HandlerDB) askVacuum() {

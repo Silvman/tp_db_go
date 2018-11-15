@@ -6,8 +6,8 @@ import (
 	"github.com/Silvman/tech-db-forum/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -15,7 +15,7 @@ import (
 func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
@@ -37,7 +37,7 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 			&ePostFull.Post.Author,
 		); err != nil {
 
-		log.Println(err)
+		check(err)
 		currentErr := models.Error{Message: fmt.Sprintf("Can't find post with id: %s", params.ID)}
 		return operations.NewPostGetOneNotFound().WithPayload(&currentErr)
 	}
@@ -55,7 +55,7 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 					ePostFull.Author = &models.User{}
 					if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, ePostFull.Post.Author).
 						Scan(&ePostFull.Author.Nickname, &ePostFull.Author.Fullname, &ePostFull.Author.About, &ePostFull.Author.Email); err != nil {
-						log.Println(err)
+						check(err)
 					}
 				}
 
@@ -70,7 +70,7 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 							&ePostFull.Forum.Threads,
 							&ePostFull.Forum.User,
 						); err != nil {
-						log.Println(err)
+						check(err)
 					}
 				}
 
@@ -89,7 +89,7 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 							&ePostFull.Thread.Forum,
 							&ePostFull.Thread.Author,
 						); err != nil {
-						log.Println(err)
+						check(err)
 					}
 
 					if pgSlug.Status != pgtype.Null {
@@ -108,7 +108,7 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	return operations.NewPostGetOneOK().WithPayload(&ePostFull)
@@ -117,14 +117,14 @@ func (self HandlerDB) PostGetOne(params operations.PostGetOneParams) middleware.
 func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
 	pgTime := pgtype.Timestamptz{}
 	ePost := models.Post{}
 
-	log.Println("post_update")
+	check("post_update")
 
 	if err := tx.QueryRow(`select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`, params.ID).Scan(
 		&ePost.ID,
@@ -136,7 +136,7 @@ func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.
 		&ePost.Thread,
 		&ePost.Author,
 	); err != nil {
-		log.Println(err)
+		check(err)
 		currentErr := models.Error{Message: fmt.Sprintf("Can't find post with id: %d", params.ID)}
 		return operations.NewPostUpdateNotFound().WithPayload(&currentErr)
 	}
@@ -155,7 +155,7 @@ func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.
 			&ePost.Thread,
 			&ePost.Author,
 		); err != nil {
-			log.Println(err)
+			check(err)
 		}
 		t := strfmt.NewDateTime()
 		t.Scan(pgTime.Time)
@@ -164,7 +164,7 @@ func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	return operations.NewPostUpdateOK().WithPayload(&ePost)
@@ -173,11 +173,11 @@ func (self HandlerDB) PostUpdate(params operations.PostUpdateParams) middleware.
 func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
-	log.Println("posts_create")
+	check("posts_create")
 
 	queryCheck := "select id, forum from threads where"
 	currentErr := models.Error{}
@@ -197,7 +197,7 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	}
 
 	if len(params.Posts) == 0 {
-		log.Println("nilPosts")
+		check("nilPosts")
 		return operations.NewPostsCreateCreated().WithPayload(params.Posts)
 	}
 
@@ -206,15 +206,31 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	var queryValues []string
 
 	args := []interface{}{}
+	parents := []string{}
 	for _, value := range params.Posts {
-		var tId int32
-
 		if value.Parent != 0 {
-			// Нет в документации к апи!
-			if err := tx.QueryRow(`select thread from posts where id = $1`, value.Parent).Scan(&tId); err != nil {
-				currentErr := models.Error{Message: fmt.Sprintf("Parent post was created in another thread")}
-				return operations.NewPostsCreateConflict().WithPayload(&currentErr)
-			}
+			parents = append(parents, strconv.Itoa(int(value.Parent)))
+		}
+
+		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5))
+		args = append(args, value.Parent, value.Message, tIdCurrent, value.Author, tForumCurrent)
+	}
+
+	if len(parents) != 0 {
+		rows, err := tx.Query(fmt.Sprint(`select thread from posts where id in (`, strings.Join(parents, ","), ")"))
+		check(err)
+
+		check(fmt.Sprint(`select thread from posts where id in (`, strings.Join(parents, ","), ")"))
+		hasP := false
+
+		for rows.Next() {
+			hasP = true
+			check("select parent thread")
+
+			var tId int32
+			err = rows.Scan(&tId)
+			check(err)
+			check(tId)
 
 			if tId != tIdCurrent {
 				currentErr := models.Error{Message: fmt.Sprintf("Parent post was created in another thread")}
@@ -222,30 +238,23 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 			}
 		}
 
-		var nick string
-		if err := tx.QueryRow("select nickname from users where nickname = $1", value.Author).Scan(&nick); err != nil {
-			currentErr := models.Error{Message: fmt.Sprintf("Can't find post author by nickname: %s", value.Author)}
-			return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
+		if !hasP {
+			currentErr := models.Error{Message: fmt.Sprintf("Parent post was created in another thread")}
+			return operations.NewPostsCreateConflict().WithPayload(&currentErr)
 		}
-
-		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5))
-		args = append(args, value.Parent, value.Message, tIdCurrent, nick, tForumCurrent)
 	}
 
 	query += strings.Join(queryValues, ",") + queryEnd
-
 	posts := models.Posts{}
-
 	rows, err := tx.Query(query, args...)
-	if err != nil {
-		log.Println(err)
-	}
 
 	for rows.Next() {
+		check("insert post")
+
 		t := models.Post{}
 		pgTime := pgtype.Timestamptz{}
 		err = rows.Scan(&t.ID, &t.Parent, &t.Message, &t.IsEdited, &t.Forum, &pgTime, &t.Thread, &t.Author)
-		log.Println(err)
+		check(err)
 
 		time := strfmt.NewDateTime()
 		time.Scan(pgTime.Time)
@@ -255,9 +264,25 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 		posts = append(posts, &t)
 	}
 
+	if err := rows.Err(); err != nil {
+		if err.(pgx.PgError).Code == "23503" {
+			//check(err.(pgx.PgError).Detail)
+			currentErr := models.Error{Message: fmt.Sprintf("Can't find post author by nickname")}
+			return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
+		}
+
+		check("error on main query")
+		//log.Println(err)
+		//log.Println(err.(pgx.PgError))
+		check(err)
+		check(err.(pgx.PgError).Error())
+		currentErr := models.Error{Message: fmt.Sprintf("Parent post was created in another thread")}
+		return operations.NewPostsCreateConflict().WithPayload(&currentErr)
+	}
+
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	return operations.NewPostsCreateCreated().WithPayload(posts)

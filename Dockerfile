@@ -16,6 +16,7 @@ RUN echo "listen_addresses='*'" >> /etc/postgresql/$PGVER/main/postgresql.conf
 USER root
 
 RUN apt install -y golang-$GOVER git
+RUN useradd docker
 
 ENV GOROOT /usr/lib/go-$GOVER
 ENV GOPATH /opt/go

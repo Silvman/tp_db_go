@@ -15,12 +15,12 @@ func (self HandlerDB) Clear(params operations.ClearParams) middleware.Responder 
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(`truncate table votes, forums_users, users, forums, threads, posts`); err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	return operations.NewClearOK()
@@ -33,7 +33,7 @@ func (self HandlerDB) Status(params operations.StatusParams) middleware.Responde
 	}
 	defer tx.Rollback()
 
-	log.Println("status")
+	check("status")
 
 	status := models.Status{}
 	tx.QueryRow("select count(*) from users").Scan(&status.User)
@@ -43,7 +43,7 @@ func (self HandlerDB) Status(params operations.StatusParams) middleware.Responde
 
 	err = tx.Commit()
 	if err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	return operations.NewStatusOK().WithPayload(&status)

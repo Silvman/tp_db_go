@@ -46,12 +46,13 @@ create table threads (
 create table posts (
   id          bigserial primary key,
   parent      bigint default 0,
-  rootParent  bigint default 0,
+--   rootParent  bigint default 0,
   mPath       bigint[],
   message     text not null,
   isEdit      boolean default false,
   forum       citext references forums(slug),
   created     timestamp with time zone default current_timestamp,
+
   thread      bigint references threads(id),
   author      citext collate "ucs_basic" references users(nickname)
 );
@@ -66,15 +67,15 @@ create table votes (
 
 create index on threads (created);
 create index on threads (forum);
-create index on threads (author);
+-- create index on threads (author);
 
 create index on votes (thread);
 
-create index on posts (parent);
+-- create index on posts (parent);
 create index on posts (thread);
-create index on posts (author);
+-- create index on posts (author);
 -- create index on posts (mPath);
-create index on posts(rootParent);
+-- create index on posts(rootParent);
 
 create or replace function establish_forum_users() returns trigger as $$
 begin
@@ -106,13 +107,15 @@ create or replace function posts_build_path() returns trigger as $$
 begin
   if new.parent = 0 then
     update posts set
-        mPath = array_append('{}'::bigint[], id),
-        rootParent = new.id
+        mPath = array_append('{}'::bigint[], id)
+--         ,
+--         rootParent = new.id
     where id = new.id;
   else
     update posts set
-        mPath = array_append((select mPath from posts where id = new.parent), id),
-        rootParent = (select rootParent from posts where id = new.parent)
+        mPath = array_append((select mPath from posts where id = new.parent), id)
+--         ,
+--         rootParent = (select rootParent from posts where id = new.parent)
     where id = new.id;
   end if;
   insert into forums_users (forum, uid) values (new.forum, (select id from users where nickname = new.author)) on conflict do nothing;

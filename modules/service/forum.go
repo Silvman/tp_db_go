@@ -7,7 +7,6 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/jackc/pgx/pgtype"
-	"log"
 )
 
 const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug=$1`
@@ -20,24 +19,24 @@ func (self HandlerDB) () middleware.Responder {
 
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
 	err = tx.Commit()
 	if err != nil {
-    	log.Println(err)
+    	check(err)
 	}
 */
 
 func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
-	log.Println("forum_create")
+	check("forum_create")
 
 	forumExisting := models.Forum{}
 
@@ -60,7 +59,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 
 	if err := tx.QueryRow(qInsertForum, params.Forum.Slug, params.Forum.Title, nickname).
 		Scan(&params.Forum.User); err != nil {
-		log.Println(err)
+		check(err)
 	}
 
 	tx.Commit()
@@ -70,7 +69,7 @@ func (self HandlerDB) ForumCreate(params operations.ForumCreateParams) middlewar
 func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
@@ -95,7 +94,7 @@ func (self HandlerDB) ForumGetOne(params operations.ForumGetOneParams) middlewar
 func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
@@ -138,7 +137,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 		thread := models.Thread{}
 		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &pgTime, &thread.Forum, &thread.Author)
 		if err != nil {
-			log.Println(err)
+			check(err)
 		}
 
 		if pgSlug.Status != pgtype.Null {
@@ -160,7 +159,7 @@ func (self HandlerDB) ForumGetThreads(params operations.ForumGetThreadsParams) m
 func (self HandlerDB) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		log.Fatalln(err)
+		check(err)
 	}
 	defer tx.Rollback()
 
@@ -205,11 +204,11 @@ where forum = $1`
 		args = append(args, *params.Limit)
 		query += fmt.Sprintf(" limit $%d", len(args))
 	}
-	log.Println(query)
+	check(query)
 
 	rows, err := tx.Query(query, args...)
 
-	log.Println(err)
+	check(err)
 
 	existingUsers := models.Users{}
 
