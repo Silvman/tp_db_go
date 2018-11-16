@@ -43,7 +43,7 @@ func NewHandler() (*HandlerDB, error) {
 }
 
 func check(err interface{}) {
-	//log.Println(err)
+	log.Println(err)
 }
 
 func (self *HandlerDB) askVacuum() {

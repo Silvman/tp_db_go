@@ -180,6 +180,8 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 	}
 	defer tx.Rollback()
 
+	check("get_posts")
+
 	queryCheck := "select id from threads where"
 	currentErr := models.Error{}
 
@@ -195,6 +197,8 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 	if err := tx.QueryRow(queryCheck, params.SlugOrID).Scan(&tId); err != nil {
 		return operations.NewThreadGetPostsNotFound().WithPayload(&currentErr)
 	}
+
+	check("thread_valid")
 
 	args := []interface{}{}
 	//var qValues []string
@@ -292,12 +296,10 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 		}
 	}
 
-	//check("- begin -----")
-	//check(params.HTTPRequest.URL)
-	//check(query)
-	//check("- end -------")
-
+	check("- begin -----")
 	check(query)
+	check("- end -------")
+
 	rows, err := tx.Query(query, args...)
 	if err != nil {
 		check(err)
@@ -309,7 +311,7 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
-		//log.Printf("fit\n")
+		check("fit\n")
 		post := models.Post{}
 		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &pgTime, &post.Thread, &post.Author)
 		if err != nil {
@@ -328,6 +330,9 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 		fetchPosts = append(fetchPosts, &post)
 	}
 
+	rows.Close()
+
+	check("precommit")
 	if err = tx.Commit(); err != nil {
 		check(err)
 	}
