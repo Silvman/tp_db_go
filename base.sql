@@ -57,12 +57,12 @@ create table posts (
   created    timestamp with time zone default current_timestamp,
 
   thread     bigint default 0,
-  author     citext collate "ucs_basic"
+  author     citext collate "ucs_basic" references users (nickname)
 );
 
 create table votes (
-  author citext collate "ucs_basic",
-  thread bigint references,
+  author citext collate "ucs_basic" references users (nickname),
+  thread bigint,
   vote   int default 1,
 
   constraint author_thread_unique unique (thread, author)
