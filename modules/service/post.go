@@ -202,18 +202,30 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	}
 
 	query := `insert into posts (parent, message, thread, author, forum) values `
-	queryEnd := " returning id, parent, message, isEdit, forum, created, thread, author"
+	queryEnd := " returning id, isEdit, created"
 	var queryValues []string
 
-	args := []interface{}{}
-	parents := []string{}
-	for _, value := range params.Posts {
-		if value.Parent != 0 {
-			parents = append(parents, strconv.Itoa(int(value.Parent)))
-		}
+	args := make([]interface{}, 0, len(params.Posts)*5)
+	//var args []interface{}
+	parents := make([]string, 0, len(params.Posts))
 
-		queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5))
-		args = append(args, value.Parent, value.Message, tIdCurrent, value.Author, tForumCurrent)
+	if len(params.Posts) == 100 {
+		for _, value := range params.Posts {
+			if value.Parent != 0 {
+				parents = append(parents, strconv.Itoa(int(value.Parent)))
+			}
+
+			args = append(args, value.Parent, value.Message, tIdCurrent, value.Author, tForumCurrent)
+		}
+	} else {
+		for _, value := range params.Posts {
+			if value.Parent != 0 {
+				parents = append(parents, strconv.Itoa(int(value.Parent)))
+			}
+
+			queryValues = append(queryValues, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5))
+			args = append(args, value.Parent, value.Message, tIdCurrent, value.Author, tForumCurrent)
+		}
 	}
 
 	if len(parents) != 0 {
@@ -245,28 +257,66 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	}
 
 	query += strings.Join(queryValues, ",") + queryEnd
-	posts := models.Posts{}
+
+	check(query)
+	//log.Printf("%#v\n", args)
+
+	if len(params.Posts) == 100 {
+		query = "bigInsert"
+	}
+
 	rows, err := tx.Query(query, args...)
 
-	for rows.Next() {
-		check("insert post")
+	var par []string
+	var nopar []string
+	var auth []interface{}
+	var querries []string
+	auth = append(auth, tForumCurrent)
+	for _, value := range params.Posts {
+		if rows.Next() {
+			check("insert post")
 
-		t := models.Post{}
-		pgTime := pgtype.Timestamptz{}
-		err = rows.Scan(&t.ID, &t.Parent, &t.Message, &t.IsEdited, &t.Forum, &pgTime, &t.Thread, &t.Author)
-		check(err)
+			pgTime := pgtype.Timestamptz{}
+			err = rows.Scan(&value.ID, &value.IsEdited, &pgTime)
+			check(err)
 
-		time := strfmt.NewDateTime()
-		time.Scan(pgTime.Time)
+			if value.Parent != 0 {
+				par = append(par, strconv.Itoa(int(value.ID)))
+			} else {
+				nopar = append(nopar, strconv.Itoa(int(value.ID)))
+			}
 
-		t.Created = &time
+			auth = append(auth, value.Author)
+			querries = append(querries, fmt.Sprintf(`($1, (select id from users where nickname = $%d))`, len(auth)))
 
-		posts = append(posts, &t)
+			value.Forum = tForumCurrent
+			value.Thread = tIdCurrent
+
+			time := strfmt.NewDateTime()
+			time.Scan(pgTime.Time)
+			value.Created = &time
+		}
 	}
+	rows.Close()
+
+	if len(par) != 0 {
+		tx.Exec(`update posts p set mPath = array_append((select mPath from posts where id = p.parent), id),
+                 rootParent = (select rootParent from posts where id = p.parent)
+where id in (` + strings.Join(par, ",") + ")")
+	}
+
+	if len(nopar) != 0 {
+		tx.Exec("update posts set mPath = array_append('{}'::bigint[], id), rootParent = id where id in (" + strings.Join(nopar, ",") + ")")
+	}
+
+	tx.Exec("update forums set posts = posts + $1 where slug = $2", len(params.Posts), tForumCurrent)
+
+	tx.Exec(`insert into forums_users (forum, uid) values `+strings.Join(querries, ",")+`on conflict do nothing`, auth...)
 
 	if err := rows.Err(); err != nil {
 		if err.(pgx.PgError).Code == "23503" {
-			//check(err.(pgx.PgError).Detail)
+			//log.Println("f")
+
 			currentErr := models.Error{Message: fmt.Sprintf("Can't find post author by nickname")}
 			return operations.NewPostsCreateNotFound().WithPayload(&currentErr)
 		}
@@ -285,5 +335,5 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 		check(err)
 	}
 
-	return operations.NewPostsCreateCreated().WithPayload(posts)
+	return operations.NewPostsCreateCreated().WithPayload(params.Posts)
 }

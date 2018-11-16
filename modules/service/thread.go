@@ -259,15 +259,15 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 	case "parent_tree":
 		{
 			query = `select id, parent, message, isEdit, forum, created, thread, author
-			from posts where mPath[1] in
+			from posts where rootParent in
 			(select id from posts where thread = $1 and parent = 0`
 
 			if params.Since != nil {
 				args = append(args, *params.Since)
 				if params.Desc != nil && *params.Desc {
-					query += fmt.Sprintf(" and id < (select mPath[1] from posts where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and id < (select rootParent from posts where id = $%d) ", len(args))
 				} else {
-					query += fmt.Sprintf(" and id > (select mPath[1] from posts where id = $%d) ", len(args))
+					query += fmt.Sprintf(" and id > (select rootParent from posts where id = $%d) ", len(args))
 				}
 			}
 
@@ -285,7 +285,7 @@ func (self HandlerDB) ThreadGetPosts(params operations.ThreadGetPostsParams) mid
 			query += `)`
 
 			if params.Desc != nil && *params.Desc {
-				query += " order by mPath[1] desc, mPath"
+				query += " order by rootParent desc, mPath"
 			} else {
 				query += " order by mPath"
 			}
