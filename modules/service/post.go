@@ -300,13 +300,13 @@ func (self HandlerDB) PostsCreate(params operations.PostsCreateParams) middlewar
 	rows.Close()
 
 	if len(par) != 0 {
-		tx.Exec(`update posts p set mPath = array_append((select mPath from posts where id = p.parent), id),
+		tx.Exec(`update posts p set mPath = (select mPath from posts where id = p.parent) || id,
                  rootParent = (select rootParent from posts where id = p.parent)
 where id in (` + strings.Join(par, ",") + ")")
 	}
 
 	if len(nopar) != 0 {
-		tx.Exec("update posts set mPath = array_append('{}'::bigint[], id), rootParent = id where id in (" + strings.Join(nopar, ",") + ")")
+		tx.Exec("update posts set mPath[1] = id, rootParent = id where id in (" + strings.Join(nopar, ",") + ")")
 	}
 
 	tx.Exec("update forums set posts = posts + $1 where slug = $2", len(params.Posts), tForumCurrent)

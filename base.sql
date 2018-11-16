@@ -21,15 +21,15 @@ create table forums (
 );
 
 create table forums_users (
-  forum citext collate "ucs_basic" references forums (slug),
-  uid   bigserial references users (id),
+  forum citext collate "ucs_basic",
+  uid   bigserial,
 
-  constraint forum_uid_unique unique (forum, uid)
+  primary key (forum, uid)
 );
-
--- ?
-create index on forums_users (uid);
--- create index on forums_users(forum);
+--
+-- -- ?
+-- create index on forums_users (uid);
+-- -- create index on forums_users(forum);
 
 
 create table threads (
@@ -50,19 +50,19 @@ create table posts (
 
   parent     bigint                   default 0 ,
   rootParent bigint                   default 0 ,
-  mPath      bigint [],
+  mPath      bigint []                not null  default '{}'::bigint[],
   message    text not null,
   isEdit     boolean                  default false,
-  forum      citext references forums (slug),
+  forum      citext collate "ucs_basic",
   created    timestamp with time zone default current_timestamp,
 
-  thread     bigint references threads (id),
-  author     citext collate "ucs_basic" references users (nickname)
+  thread     bigint default 0,
+  author     citext collate "ucs_basic"
 );
 
 create table votes (
-  author citext collate "ucs_basic" references users (nickname),
-  thread bigint references threads (id),
+  author citext collate "ucs_basic",
+  thread bigint references,
   vote   int default 1,
 
   constraint author_thread_unique unique (thread, author)
