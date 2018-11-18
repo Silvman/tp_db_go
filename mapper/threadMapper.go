@@ -10,34 +10,6 @@ import (
 	"strings"
 )
 
-const qSelectThreadsForumTitle = `select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))`
-const qSelectThreadsForumSlug = `select id, title, message, votes, slug, created, forum, author from threads where (slug = $1)`
-
-const qInsertThread = `insert into threads (title, message, author, forum) values ($1, $2, $3, $4) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadCreated = `insert into threads (title, message, author, forum, created) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadCreatedSlug = `insert into threads (title, message, author, forum, created, slug) values ($1, $2, $3, $4, $5, $6) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadSlug = `insert into threads (title, message, author, forum, slug) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
-
-const qSelectThreadBySlug = `select id, title, message, votes, slug, created, forum, author from threads where slug = $1`
-
-const qSelectIdFromThreadsId = `select id from threads where id = $1::bigint`
-const qSelectIdFromThreadsSlug = `select id from threads where slug = $1`
-
-const qSelectPostsPTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id desc limit $2) order by rootParent desc, mPath`
-const qSelectPostsPT = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id limit $2) order by mPath`
-const qSelectPostsPTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id < (select rootParent from posts where id = $2)  order by id desc limit $3) order by rootParent desc, mPath`
-const qSelectPostsPTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id > (select rootParent from posts where id = $2)  order by id limit $3) order by mPath`
-
-const qSelectPostsTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath desc limit $2`
-const qSelectPostsT = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath limit $2`
-const qSelectPostsTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath < (select mPath from posts where id = $2)  order by mPath desc limit $3`
-const qSelectPostsTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath > (select mPath from posts where id = $2)  order by mPath limit $3`
-
-const qSelectPostsFDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id desc limit $2`
-const qSelectPostsF = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id limit $2`
-const qSelectPostsFSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id < $2 order by id desc limit $3`
-const qSelectPostsFSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id > $2 order by id limit $3`
-
 func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.Thread, error) {
 	tx, err := self.pool.Begin()
 	if err != nil {
@@ -106,22 +78,15 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 }
 
 func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
-	//pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
 
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := tx.QueryRow(qSelectThreadBySlug, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+		if err := self.pool.QueryRow(qSelectThreadBySlug, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := tx.QueryRow(qSelectThreadById, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+		if err := self.pool.QueryRow(qSelectThreadById, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
@@ -130,32 +95,22 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 		eThread.Slug = pgSlug.String
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		check(err)
-	}
-
 	return &eThread, nil
 }
 
 func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, Desc *bool, Limit *int) (models.Posts, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
 	var tId int32
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := tx.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := tx.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
 
+	var err error
 	var rows *pgx.Rows
 	switch *Sort {
 	default:
@@ -165,15 +120,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsFSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsFSinceDesc, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsFDesc, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsFDesc, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsFSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsFSince, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsF, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsF, tId, *Limit)
 				}
 			}
 		}
@@ -182,15 +137,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsTSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsTSinceDesc, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsTDesc, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsTDesc, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsTSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsTSince, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsT, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsT, tId, *Limit)
 				}
 			}
 		}
@@ -199,15 +154,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsPTSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsPTSinceDesc, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsPTDesc, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsPTDesc, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = tx.Query(qSelectPostsPTSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query(qSelectPostsPTSince, tId, *Since, *Limit)
 				} else {
-					rows, err = tx.Query(qSelectPostsPT, tId, *Limit)
+					rows, err = self.pool.Query(qSelectPostsPT, tId, *Limit)
 				}
 			}
 		}
@@ -231,10 +186,6 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		}
 
 		fetchPosts = append(fetchPosts, &post)
-	}
-
-	if err = tx.Commit(); err != nil {
-		check(err)
 	}
 
 	return fetchPosts, nil

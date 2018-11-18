@@ -6,6 +6,57 @@ import (
 	"time"
 )
 
+const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug = $1`
+const qSelectUsersNickname = `select nickname from users where nickname = $1`
+const qInsertForum = `insert into forums (slug, title, owner) values ($1, $2, $3) returning owner`
+const qSelectSlug = `select slug from forums where slug = $1`
+
+const qSelectUsersSinceDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname < $2 order by u.nickname desc limit $3`
+const qSelectUsersDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname desc limit $2`
+const qSelectUsersSince = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname > $2 order by u.nickname limit $3`
+const qSelectUsers = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname limit $2`
+
+const qSelectThreadsCreatedDesc = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created <= $2::timestamptz order by created desc limit $3`
+const qSelectThreadsCreated = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created >= $2::timestamptz order by created limit $3`
+const qSelectThreadsDesc = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created desc limit $2`
+const qSelectThreads = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created limit $2`
+
+const qSelectPostById = `select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`
+const qSelectUserByNick = `select nickname, fullname, about, email from users where nickname = $1`
+const qSelectThreadById = `select id, title, message, votes, slug, created, forum, author from threads where id = $1`
+const qUpdatePost = `update posts set isEdit = true, message = $1 where id = $2 returning id, parent, message, isEdit, forum, created, thread, author`
+const qUpdateForumPosts = `update forums set posts = posts + $1 where slug = $2`
+const qSelectIdForumFromThreadsId = `select id, forum from threads where id = $1::bigint`
+const qSelectIdForumFromThreadsSlug = `select id, forum from threads where slug = $1`
+
+const qSelectThreadsForumTitle = `select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))`
+const qSelectThreadsForumSlug = `select id, title, message, votes, slug, created, forum, author from threads where (slug = $1)`
+
+const qInsertThread = `insert into threads (title, message, author, forum) values ($1, $2, $3, $4) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadCreated = `insert into threads (title, message, author, forum, created) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadCreatedSlug = `insert into threads (title, message, author, forum, created, slug) values ($1, $2, $3, $4, $5, $6) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadSlug = `insert into threads (title, message, author, forum, slug) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
+
+const qSelectThreadBySlug = `select id, title, message, votes, slug, created, forum, author from threads where slug = $1`
+
+const qSelectIdFromThreadsId = `select id from threads where id = $1::bigint`
+const qSelectIdFromThreadsSlug = `select id from threads where slug = $1`
+
+const qSelectPostsPTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id desc limit $2) order by rootParent desc, mPath`
+const qSelectPostsPT = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id limit $2) order by mPath`
+const qSelectPostsPTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id < (select rootParent from posts where id = $2)  order by id desc limit $3) order by rootParent desc, mPath`
+const qSelectPostsPTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id > (select rootParent from posts where id = $2)  order by id limit $3) order by mPath`
+
+const qSelectPostsTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath desc limit $2`
+const qSelectPostsT = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath limit $2`
+const qSelectPostsTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath < (select mPath from posts where id = $2)  order by mPath desc limit $3`
+const qSelectPostsTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath > (select mPath from posts where id = $2)  order by mPath limit $3`
+
+const qSelectPostsFDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id desc limit $2`
+const qSelectPostsF = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id limit $2`
+const qSelectPostsFSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id < $2 order by id desc limit $3`
+const qSelectPostsFSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id > $2 order by id limit $3`
+
 type HandlerDB struct {
 	pool      *pgx.ConnPool
 	bigInsert *pgx.PreparedStatement
@@ -38,9 +89,9 @@ func NewHandler() (*HandlerDB, error) {
 	config := pgx.ConnConfig{
 		Host:     "localhost",
 		Port:     5432,
-		User:     "docker",
-		Password: "docker",
-		Database: "docker",
+		User:     "test",
+		Password: "test",
+		Database: "test",
 	}
 
 	handler := &HandlerDB{}

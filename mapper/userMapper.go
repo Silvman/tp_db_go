@@ -8,15 +8,7 @@ import (
 )
 
 func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models.Users, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
-	check("user_create")
-
-	rows, _ := tx.Query(`select nickname, fullname, about, email from users where nickname = $1 or email = $2`, Nickname, Profile.Email)
+	rows, _ := self.pool.Query(`select nickname, fullname, about, email from users where nickname = $1 or email = $2`, Nickname, Profile.Email)
 	eUsers := models.Users{}
 	for rows.Next() {
 		eUser := models.User{}
@@ -28,12 +20,7 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 		return &eUsers, errors.New("already exists")
 	}
 
-	_, err = tx.Exec(`insert into users values ($1, $2, $3, $4)`, Nickname, Profile.Fullname, Profile.About, Profile.Email)
-	if err != nil {
-		check(err)
-	}
-
-	err = tx.Commit()
+	_, err := self.pool.Exec(`insert into users values ($1, $2, $3, $4)`, Nickname, Profile.Fullname, Profile.About, Profile.Email)
 	if err != nil {
 		check(err)
 	}
@@ -45,21 +32,10 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 }
 
 func (self HandlerDB) UserGetOne(Nickname string) (*models.User, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
 	eUser := models.User{}
-	if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, Nickname).
+	if err := self.pool.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, Nickname).
 		Scan(&eUser.Nickname, &eUser.Fullname, &eUser.About, &eUser.Email); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname: %s", Nickname))
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		check(err)
 	}
 
 	return &eUser, nil

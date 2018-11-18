@@ -10,26 +10,12 @@ import (
 	"strings"
 )
 
-const qSelectPostById = `select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`
-const qSelectUserByNick = `select nickname, fullname, about, email from users where nickname = $1`
-const qSelectThreadById = `select id, title, message, votes, slug, created, forum, author from threads where id = $1`
-const qUpdatePost = `update posts set isEdit = true, message = $1 where id = $2 returning id, parent, message, isEdit, forum, created, thread, author`
-const qUpdateForumPosts = `update forums set posts = posts + $1 where slug = $2`
-const qSelectIdForumFromThreadsId = `select id, forum from threads where id = $1::bigint`
-const qSelectIdForumFromThreadsSlug = `select id, forum from threads where slug = $1`
-
 func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
 	ePostFull := models.PostFull{}
 	ePostFull.Post = &models.Post{}
 
 	// todo а нам нужны все эти поля?
-	if err := tx.QueryRow(qSelectPostById, ID).
+	if err := self.pool.QueryRow(qSelectPostById, ID).
 		Scan(
 			&ePostFull.Post.ID,
 			&ePostFull.Post.Parent,
@@ -49,7 +35,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 			case "user":
 				{
 					ePostFull.Author = &models.User{}
-					if err := tx.QueryRow(qSelectUserByNick, ePostFull.Post.Author).
+					if err := self.pool.QueryRow(qSelectUserByNick, ePostFull.Post.Author).
 						Scan(&ePostFull.Author.Nickname, &ePostFull.Author.Fullname, &ePostFull.Author.About, &ePostFull.Author.Email); err != nil {
 						check(err)
 					}
@@ -58,7 +44,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 			case "forum":
 				{
 					ePostFull.Forum = &models.Forum{}
-					if err := tx.QueryRow(qSelectForumBySlug, ePostFull.Post.Forum).
+					if err := self.pool.QueryRow(qSelectForumBySlug, ePostFull.Post.Forum).
 						Scan(
 							&ePostFull.Forum.Slug,
 							&ePostFull.Forum.Title,
@@ -74,7 +60,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 				{
 					pgSlug := pgtype.Text{}
 					ePostFull.Thread = &models.Thread{}
-					if err := tx.QueryRow(qSelectThreadById, ePostFull.Post.Thread).
+					if err := self.pool.QueryRow(qSelectThreadById, ePostFull.Post.Thread).
 						Scan(
 							&ePostFull.Thread.ID,
 							&ePostFull.Thread.Title,
@@ -94,11 +80,6 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 				}
 			}
 		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		check(err)
 	}
 
 	return &ePostFull, nil
