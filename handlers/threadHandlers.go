@@ -86,7 +86,6 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 		*desc = true
 	}
 
-	log.Println()
 	payload, err := DB.ThreadGetPosts(slug, &sort, since, desc, limit)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)

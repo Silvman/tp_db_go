@@ -13,12 +13,6 @@ func GetPostDetails(ctx *fasthttp.RequestCtx) {
 	relatedVal := string(ctx.QueryArgs().Peek("related"))
 
 	related := strings.Split(relatedVal, ",")
-	//
-	//var related []string
-	//for _, value := range relatedBytes {
-	//	related = append(related, string(value))
-	//	log.Println(string(value))
-	//}
 
 	payload, err := DB.PostGetOne(id, related)
 	if err != nil {
