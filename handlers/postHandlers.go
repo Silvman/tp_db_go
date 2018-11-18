@@ -20,7 +20,7 @@ func GetPostDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, err := payload.MarshalBinary()
+	body, err := payload.MarshalJSON()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -32,7 +32,7 @@ func UpdatePostDetails(ctx *fasthttp.RequestCtx) {
 	id, _ := strconv.Atoi(ctx.UserValue("id").(string))
 
 	var pendingUpdate models.PostUpdate
-	pendingUpdate.UnmarshalBinary(ctx.PostBody())
+	pendingUpdate.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.PostUpdate(id, &pendingUpdate)
 	if err != nil {
@@ -40,7 +40,7 @@ func UpdatePostDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, err := payload.MarshalBinary()
+	body, err := payload.MarshalJSON()
 	if err != nil {
 		log.Fatalln(err)
 	}

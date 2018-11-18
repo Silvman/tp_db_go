@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/valyala/fasthttp"
@@ -18,12 +17,12 @@ func CreateForum(ctx *fasthttp.RequestCtx) {
 	}
 
 	var pendingForum models.Forum
-	pendingForum.UnmarshalBinary(ctx.PostBody())
+	pendingForum.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.ForumCreate(&pendingForum)
 	if err != nil {
 		if payload != nil {
-			body, _ := payload.MarshalBinary()
+			body, _ := payload.MarshalJSON()
 			WriteResponseJSON(ctx, fasthttp.StatusConflict, body)
 		} else {
 			WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
@@ -31,7 +30,7 @@ func CreateForum(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }
 
@@ -42,7 +41,7 @@ func GetForumDetails(ctx *fasthttp.RequestCtx) {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
 		return
 	}
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }
@@ -80,7 +79,7 @@ func GetForumUsers(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, err := json.Marshal(payload)
+	body, err := payload.MarshalJSON()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -122,7 +121,7 @@ func GetForumThreads(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, err := json.Marshal(payload)
+	body, err := payload.MarshalJSON()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -134,12 +133,12 @@ func CreateThread(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_action").(string)
 
 	var pendingThread models.Thread
-	pendingThread.UnmarshalBinary(ctx.PostBody())
+	pendingThread.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.ThreadCreate(slug, &pendingThread)
 	if err != nil {
 		if payload != nil {
-			body, _ := payload.MarshalBinary()
+			body, _ := payload.MarshalJSON()
 			WriteResponseJSON(ctx, fasthttp.StatusConflict, body)
 		} else {
 			WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
@@ -147,7 +146,7 @@ func CreateThread(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	// todo часть новосозданные значений - копия переданных
 	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }

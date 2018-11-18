@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/valyala/fasthttp"
 	"log"
@@ -11,7 +10,7 @@ import (
 func CreatePosts(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
 	var pendingPosts models.Posts
-	err := json.Unmarshal(ctx.PostBody(), &pendingPosts)
+	pendingPosts.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.PostsCreate(slug, pendingPosts)
 	if err != nil {
@@ -24,7 +23,7 @@ func CreatePosts(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := json.Marshal(payload)
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }
 
@@ -36,7 +35,7 @@ func GetThreadDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 
 }
@@ -44,7 +43,7 @@ func GetThreadDetails(ctx *fasthttp.RequestCtx) {
 func UpdateThreadDetails(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
 	var pendingThread models.ThreadUpdate
-	pendingThread.UnmarshalBinary(ctx.PostBody())
+	pendingThread.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.ThreadUpdate(slug, &pendingThread)
 	if err != nil {
@@ -52,7 +51,7 @@ func UpdateThreadDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }
 
@@ -92,7 +91,7 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, err := json.Marshal(payload)
+	body, err := payload.MarshalJSON()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -104,7 +103,7 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 func CreateThreadVote(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
 	var pendingVote models.Vote
-	pendingVote.UnmarshalBinary(ctx.PostBody())
+	pendingVote.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.ThreadVote(slug, &pendingVote)
 	if err != nil {
@@ -112,6 +111,6 @@ func CreateThreadVote(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }

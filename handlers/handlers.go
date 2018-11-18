@@ -26,6 +26,6 @@ func WriteBlankJSON(ctx *fasthttp.RequestCtx, status int) {
 
 func WriteErrorJSON(ctx *fasthttp.RequestCtx, status int, err error) {
 	msg := models.Error{Message: err.Error()}
-	body, _ := msg.MarshalBinary()
+	body, _ := msg.MarshalJSON()
 	WriteResponseJSON(ctx, status, body)
 }

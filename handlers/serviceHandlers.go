@@ -9,6 +9,6 @@ func Clear(ctx *fasthttp.RequestCtx) {
 
 func Status(ctx *fasthttp.RequestCtx) {
 	payload := DB.Status()
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }

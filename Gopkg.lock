@@ -45,6 +45,19 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:aa3d8d42865c42626b5c1add193692d045b3188b1479f0a0a88690d21fe20083"
+  name = "github.com/mailru/easyjson"
+  packages = [
+    ".",
+    "buffer",
+    "jlexer",
+    "jwriter",
+  ]
+  pruneopts = "UT"
+  revision = "60711f1a8329503b04e1c88535f419d0bb440bff"
+
+[[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
@@ -79,6 +92,9 @@
     "github.com/buaazp/fasthttprouter",
     "github.com/jackc/pgx",
     "github.com/jackc/pgx/pgtype",
+    "github.com/mailru/easyjson",
+    "github.com/mailru/easyjson/jlexer",
+    "github.com/mailru/easyjson/jwriter",
     "github.com/valyala/fasthttp",
   ]
   solver-name = "gps-cdcl"

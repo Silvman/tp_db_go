@@ -9,7 +9,7 @@ import (
 func CreateUser(ctx *fasthttp.RequestCtx) {
 	nickname := ctx.UserValue("nickname").(string)
 	var pendingUser models.User
-	pendingUser.UnmarshalBinary(ctx.PostBody())
+	pendingUser.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.UserCreate(nickname, &pendingUser)
 	if err != nil {
@@ -20,7 +20,7 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := pendingUser.MarshalBinary()
+	body, _ := pendingUser.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }
 
@@ -33,14 +33,14 @@ func GetUserDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }
 
 func UpdateUserDetails(ctx *fasthttp.RequestCtx) {
 	nickname := ctx.UserValue("nickname").(string)
 	var pendingUser models.UserUpdate
-	pendingUser.UnmarshalBinary(ctx.PostBody())
+	pendingUser.UnmarshalJSON(ctx.PostBody())
 
 	payload, err := DB.UserUpdate(nickname, &pendingUser)
 	if err != nil {
@@ -52,6 +52,6 @@ func UpdateUserDetails(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	body, _ := payload.MarshalBinary()
+	body, _ := payload.MarshalJSON()
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
 }
