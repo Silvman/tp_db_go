@@ -2,7 +2,6 @@ package mapper
 
 import (
 	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgtype"
 	"log"
 	"time"
 )
@@ -37,9 +36,9 @@ func NewHandler() (*HandlerDB, error) {
 	config := pgx.ConnConfig{
 		Host:     "localhost",
 		Port:     5432,
-		User:     "test",
-		Password: "test",
-		Database: "test",
+		User:     "docker",
+		Password: "docker",
+		Database: "docker",
 	}
 
 	handler := &HandlerDB{}
@@ -72,11 +71,4 @@ func (self *HandlerDB) checkVacuum() {
 
 func (self *HandlerDB) Vacuum() {
 	self.pool.Exec("VACUUM")
-}
-
-func tgtimeToString(pgtime *pgtype.Timestamptz, strtime *string) {
-	if err := pgtime.AssignTo(strtime); err != nil {
-		check("error on assigning time")
-		check(err)
-	}
 }

@@ -31,9 +31,8 @@ func CreateForum(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	//body, _ := payload.MarshalBinary()
-	// новосозданный форум имеет ровно те значения, которые мы ему передали
-	WriteResponseJSON(ctx, fasthttp.StatusCreated, ctx.PostBody())
+	body, _ := payload.MarshalBinary()
+	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }
 
 func GetForumDetails(ctx *fasthttp.RequestCtx) {
@@ -41,6 +40,7 @@ func GetForumDetails(ctx *fasthttp.RequestCtx) {
 	payload, err := DB.ForumGetOne(slug)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
+		return
 	}
 	body, _ := payload.MarshalBinary()
 
@@ -53,23 +53,31 @@ func GetForumUsers(ctx *fasthttp.RequestCtx) {
 
 	var limit *int = nil
 	if limitStr == "" {
+		limit = new(int)
 		*limit = 100
 	} else {
+		limit = new(int)
 		*limit, _ = strconv.Atoi(limitStr)
 	}
 
-	since := string(ctx.QueryArgs().Peek("since"))
-	// todo valid?
+	sinceStr := string(ctx.QueryArgs().Peek("since"))
+	var since *string
+	if sinceStr != "" {
+		since = new(string)
+		*since = sinceStr
+	} // todo valid?
 
 	descStr := string(ctx.QueryArgs().Peek("desc"))
 	var desc *bool = nil
 	if descStr == "true" {
+		desc = new(bool)
 		*desc = true
 	}
 
-	payload, err := DB.ForumGetUsers(slug, desc, &since, limit)
+	payload, err := DB.ForumGetUsers(slug, desc, since, limit)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
+		return
 	}
 
 	body, err := json.Marshal(payload)
@@ -86,23 +94,32 @@ func GetForumThreads(ctx *fasthttp.RequestCtx) {
 
 	var limit *int = nil
 	if limitStr == "" {
+		limit = new(int)
 		*limit = 100
 	} else {
+		limit = new(int)
 		*limit, _ = strconv.Atoi(limitStr)
 	}
 
-	since := string(ctx.QueryArgs().Peek("since"))
+	sinceStr := string(ctx.QueryArgs().Peek("since"))
+	var since *string
+	if sinceStr != "" {
+		since = new(string)
+		*since = sinceStr
+	}
 	// todo valid?
 
 	descStr := string(ctx.QueryArgs().Peek("desc"))
 	var desc *bool = nil
 	if descStr == "true" {
+		desc = new(bool)
 		*desc = true
 	}
 
-	payload, err := DB.ForumGetThreads(slug, desc, &since, limit)
+	payload, err := DB.ForumGetThreads(slug, desc, since, limit)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
+		return
 	}
 
 	body, err := json.Marshal(payload)

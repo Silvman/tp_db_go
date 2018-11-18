@@ -20,8 +20,6 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 	ePostFull := models.PostFull{}
 	ePostFull.Post = &models.Post{}
 
-	pgTime := pgtype.Timestamptz{}
-
 	if err := tx.QueryRow(`select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`, ID).
 		Scan(
 			&ePostFull.Post.ID,
@@ -29,14 +27,12 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 			&ePostFull.Post.Message,
 			&ePostFull.Post.IsEdited,
 			&ePostFull.Post.Forum,
-			&pgTime,
+			&ePostFull.Post.Created,
 			&ePostFull.Post.Thread,
 			&ePostFull.Post.Author,
 		); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find post with id: %s", ID))
 	}
-
-	tgtimeToString(&pgTime, &ePostFull.Post.Created)
 
 	if Related != nil {
 		for _, value := range Related {
@@ -76,7 +72,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 							&ePostFull.Thread.Message,
 							&ePostFull.Thread.Votes,
 							&pgSlug,
-							&pgTime,
+							&ePostFull.Thread.Created,
 							&ePostFull.Thread.Forum,
 							&ePostFull.Thread.Author,
 						); err != nil {
@@ -86,8 +82,6 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 					if pgSlug.Status != pgtype.Null {
 						ePostFull.Thread.Slug = pgSlug.String
 					}
-
-					tgtimeToString(&pgTime, &ePostFull.Thread.Created)
 				}
 			}
 		}
@@ -108,9 +102,7 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 	}
 	defer tx.Rollback()
 
-	pgTime := pgtype.Timestamptz{}
 	ePost := models.Post{}
-
 	check("post_update")
 
 	if err := tx.QueryRow(`select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`, ID).Scan(
@@ -119,14 +111,12 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 		&ePost.Message,
 		&ePost.IsEdited,
 		&ePost.Forum,
-		&pgTime,
+		&ePost.Created,
 		&ePost.Thread,
 		&ePost.Author,
 	); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find post with id: %d", ID))
 	}
-
-	tgtimeToString(&pgTime, &ePost.Created)
 
 	if Post.Message != "" && Post.Message != ePost.Message {
 		if err := tx.QueryRow(`update posts set isEdit = true, message = $1 where id = $2 returning id, parent, message, isEdit, forum, created, thread, author`, Post.Message, ID).Scan(
@@ -135,14 +125,13 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 			&ePost.Message,
 			&ePost.IsEdited,
 			&ePost.Forum,
-			&pgTime,
+			&ePost.Created,
 			&ePost.Thread,
 			&ePost.Author,
 		); err != nil {
 			check(err)
 		}
 
-		tgtimeToString(&pgTime, &ePost.Created)
 	}
 
 	err = tx.Commit()
@@ -257,8 +246,7 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 		if rows.Next() {
 			check("insert post")
 
-			pgTime := pgtype.Timestamptz{}
-			err = rows.Scan(&value.ID, &value.IsEdited, &pgTime)
+			err = rows.Scan(&value.ID, &value.IsEdited, &value.Created)
 			check(err)
 
 			if value.Parent != 0 {
@@ -273,7 +261,6 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 			value.Forum = tForumCurrent
 			value.Thread = tIdCurrent
 
-			tgtimeToString(&pgTime, &value.Created)
 		}
 	}
 	rows.Close()

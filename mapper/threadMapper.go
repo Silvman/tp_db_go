@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/jackc/pgx/pgtype"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -37,7 +38,7 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 		argsC = append(argsC, Thread.Slug)
 	}
 
-	pgTime := pgtype.Timestamptz{}
+	//pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
 	if err := tx.QueryRow(queryConflict, argsC...).
@@ -47,7 +48,7 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 			&eThread.Message,
 			&eThread.Votes,
 			&pgSlug,
-			&pgTime,
+			&eThread.Created,
 			&eThread.Forum,
 			&eThread.Author,
 		); err == nil {
@@ -55,7 +56,13 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 			eThread.Slug = pgSlug.String
 		}
 
-		tgtimeToString(&pgTime, &eThread.Created)
+		log.Printf("%v\n", eThread.Created)
+		//eThread.Created = &time.Time{}
+		//*eThread.Created = pgTime.Time
+		//
+		//if err := pgTime.AssignTo(eThread.Created); err != nil {
+		//	check(err)
+		//}
 
 		return &eThread, errors.New("already exists")
 	}
@@ -66,7 +73,7 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 	qValues := "$1, $2, $3, $4"
 	args = append(args, Thread.Title, Thread.Message, Thread.Author, slug)
 
-	if Thread.Created != "" {
+	if !Thread.Created.IsZero() {
 		args = append(args, Thread.Created)
 		qFields += ", created"
 		qValues += fmt.Sprintf(", $%d", len(args))
@@ -89,14 +96,14 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 			&newThread.Message,
 			&newThread.Votes,
 			&pgSlug,
-			&pgTime,
+			&newThread.Created,
 			&newThread.Forum,
 			&newThread.Author,
 		); err != nil {
 		check(err)
 	}
 
-	tgtimeToString(&pgTime, &newThread.Created)
+	//tgtimeToString(&pgTime, newThread.Created)
 
 	if pgSlug.Status != pgtype.Null {
 		newThread.Slug = pgSlug.String
@@ -118,7 +125,7 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 	}
 	defer tx.Rollback()
 
-	pgTime := pgtype.Timestamptz{}
+	//pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
 
@@ -139,7 +146,7 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 			&eThread.Message,
 			&eThread.Votes,
 			&pgSlug,
-			&pgTime,
+			&eThread.Created,
 			&eThread.Forum,
 			&eThread.Author,
 		); err != nil {
@@ -151,7 +158,7 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 		eThread.Slug = pgSlug.String
 	}
 
-	tgtimeToString(&pgTime, &eThread.Created)
+	//tgtimeToString(&pgTime, eThread.Created)
 
 	err = tx.Commit()
 	if err != nil {
@@ -296,12 +303,11 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 	//log.Printf("%#v\n", rows)
 
 	fetchPosts := models.Posts{}
-	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
 		check("fit\n")
 		post := models.Post{}
-		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &pgTime, &post.Thread, &post.Author)
+		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &post.Created, &post.Thread, &post.Author)
 		if err != nil {
 			check(err)
 		}
@@ -309,8 +315,6 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		if pgSlug.Status != pgtype.Null {
 			post.Forum = pgSlug.String
 		}
-
-		tgtimeToString(&pgTime, &post.Created)
 
 		fetchPosts = append(fetchPosts, &post)
 	}
@@ -367,7 +371,6 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 		qValues = append(qValues, fmt.Sprintf("title = $%d", len(args)))
 	}
 
-	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	updThread := models.Thread{}
 	query = fmt.Sprintf("update threads set "+strings.Join(qValues, ",")+" where id = %d returning id, title, message, votes, slug, created, forum, author", tId)
@@ -377,7 +380,7 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 		&updThread.Message,
 		&updThread.Votes,
 		&pgSlug,
-		&pgTime,
+		&updThread.Created,
 		&updThread.Forum,
 		&updThread.Author,
 	); err != nil {
@@ -387,8 +390,6 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 	if pgSlug.Status != pgtype.Null {
 		updThread.Slug = pgSlug.String
 	}
-
-	tgtimeToString(&pgTime, &updThread.Created)
 
 	if err = tx.Commit(); err != nil {
 		check(err)
@@ -427,7 +428,6 @@ func (self HandlerDB) ThreadVote(SlugOrID string, Vote *models.Vote) (*models.Th
 		return nil, errors.New(currentErr)
 	}
 
-	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	updThread := models.Thread{}
 	if err := tx.QueryRow(`select id, title, message, votes, slug, created, forum, author from threads where id = $1`, tId).
@@ -437,7 +437,7 @@ func (self HandlerDB) ThreadVote(SlugOrID string, Vote *models.Vote) (*models.Th
 			&updThread.Message,
 			&updThread.Votes,
 			&pgSlug,
-			&pgTime,
+			&updThread.Created,
 			&updThread.Forum,
 			&updThread.Author,
 		); err != nil {
@@ -447,8 +447,6 @@ func (self HandlerDB) ThreadVote(SlugOrID string, Vote *models.Vote) (*models.Th
 	if pgSlug.Status != pgtype.Null {
 		updThread.Slug = pgSlug.String
 	}
-
-	tgtimeToString(&pgTime, &updThread.Created)
 
 	if err = tx.Commit(); err != nil {
 		check(err)

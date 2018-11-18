@@ -7,6 +7,7 @@ package models
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // Thread Ветка обсуждения на форуме.
@@ -20,7 +21,7 @@ type Thread struct {
 
 	// Дата создания ветки на форуме.
 	// Format: date-time
-	Created string `json:"created,omitempty"`
+	Created time.Time `json:"created,omitempty"`
 
 	// Форум, в котором расположена данная ветка обсуждения.
 	// Read Only: true

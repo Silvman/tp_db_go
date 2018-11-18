@@ -30,16 +30,21 @@ func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
 		return &forumExisting, errors.New("already exists")
 	}
 
-	if err := tx.QueryRow(qInsertForum, Forum.Slug, Forum.Title, Forum.User).
-		Scan(&Forum.User); err != nil {
+	var nickname string
+	if err := tx.QueryRow(`select nickname from users where nickname = $1`, Forum.User).Scan(&nickname); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user with nickname: %s", Forum.User))
+	}
+
+	if err := tx.QueryRow(qInsertForum, Forum.Slug, Forum.Title, nickname).
+		Scan(&Forum.User); err != nil {
+		check(err)
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		check(err)
 	}
-	return nil, nil
+	return Forum, nil
 }
 
 func (self *HandlerDB) ForumGetOne(Slug string) (*models.Forum, error) {
@@ -107,11 +112,10 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 	rows, err := tx.Query(query, args...)
 
 	existingThreads := models.Threads{}
-	pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
 		thread := models.Thread{}
-		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &pgTime, &thread.Forum, &thread.Author)
+		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author)
 		if err != nil {
 			check(err)
 		}
@@ -119,8 +123,6 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 		if pgSlug.Status != pgtype.Null {
 			thread.Slug = pgSlug.String
 		}
-
-		tgtimeToString(&pgTime, &thread.Created)
 
 		existingThreads = append(existingThreads, &thread)
 	}

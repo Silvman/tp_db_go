@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"github.com/Silvman/tech-db-forum/mapper"
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/valyala/fasthttp"
@@ -10,6 +11,10 @@ var DB *mapper.HandlerDB
 
 func WriteResponseJSON(ctx *fasthttp.RequestCtx, status int, body []byte) {
 	ctx.SetContentType("application/json")
+	if bytes.Equal(body, []byte("null")) {
+		body = []byte("[]")
+	}
+
 	ctx.SetStatusCode(status)
 	ctx.Write(body)
 }

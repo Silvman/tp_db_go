@@ -7,6 +7,7 @@ package models
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // Post Сообщение внутри ветки обсуждения на форуме.
@@ -21,7 +22,7 @@ type Post struct {
 	// Дата создания сообщения на форуме.
 	// Read Only: true
 	// Format: date-time
-	Created string `json:"created,omitempty"`
+	Created time.Time `json:"created,omitempty"`
 
 	// Идентификатор форума (slug) данного сообещния.
 	// Read Only: true

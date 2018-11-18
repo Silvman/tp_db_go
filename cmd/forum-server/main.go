@@ -58,8 +58,8 @@ func main() {
 		GET("/post/:id/details", handlers.GetPostDetails)
 
 	router.
-		POST("/clear", handlers.Clear).
-		GET("/status", handlers.Status)
+		POST("/service/clear", handlers.Clear).
+		GET("/service/status", handlers.Status)
 
 	router.
 		POST("/thread/:slug_id/create", handlers.CreatePosts).

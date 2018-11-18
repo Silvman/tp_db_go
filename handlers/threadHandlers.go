@@ -10,22 +10,22 @@ import (
 
 func CreatePosts(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
-	var pendingPosts models.Posts
-	json.Unmarshal(ctx.PostBody(), pendingPosts)
+	var pendingPosts []*models.Post
+	err := json.Unmarshal(ctx.PostBody(), &pendingPosts)
 
 	payload, err := DB.PostsCreate(slug, pendingPosts)
 	if err != nil {
-		if err.Error() == "Can't find post author by nickname" {
-			WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
-		} else {
+		if err.Error() == "Parent post was created in another thread" {
 			WriteErrorJSON(ctx, fasthttp.StatusConflict, err)
+		} else {
+			WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
 
 		}
 		return
 	}
 
 	body, _ := json.Marshal(payload)
-	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
+	WriteResponseJSON(ctx, fasthttp.StatusCreated, body)
 }
 
 func GetThreadDetails(ctx *fasthttp.RequestCtx) {
@@ -64,14 +64,17 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 	limitStr := string(ctx.QueryArgs().Peek("limit"))
 	var limit *int = nil
 	if limitStr == "" {
+		limit = new(int)
 		*limit = 100
 	} else {
+		limit = new(int)
 		*limit, _ = strconv.Atoi(limitStr)
 	}
 
 	var since *int = nil
 	sinceInt, err := strconv.Atoi(string(ctx.QueryArgs().Peek("since")))
 	if err == nil {
+		since = new(int)
 		*since = sinceInt
 	}
 	// todo valid?
@@ -79,12 +82,15 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 	descStr := string(ctx.QueryArgs().Peek("desc"))
 	var desc *bool = nil
 	if descStr == "true" {
+		desc = new(bool)
 		*desc = true
 	}
 
+	log.Println()
 	payload, err := DB.ThreadGetPosts(slug, &sort, since, desc, limit)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
+		return
 	}
 
 	body, err := json.Marshal(payload)
@@ -104,6 +110,7 @@ func CreateThreadVote(ctx *fasthttp.RequestCtx) {
 	payload, err := DB.ThreadVote(slug, &pendingVote)
 	if err != nil {
 		WriteErrorJSON(ctx, fasthttp.StatusNotFound, err)
+		return
 	}
 
 	body, _ := payload.MarshalBinary()
