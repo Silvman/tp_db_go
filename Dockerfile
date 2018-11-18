@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:16.04
 
 MAINTAINER Silvman
 
@@ -6,7 +6,7 @@ USER root
 
 RUN apt-get -y update
 
-ENV PGVER 10
+ENV PGVER 9.5
 RUN apt-get install -y postgresql-$PGVER
 RUN apt install -y wget
 
@@ -41,4 +41,4 @@ RUN /etc/init.d/postgresql start &&\
 USER root
 EXPOSE 5432
 
-CMD service postgresql start && forum-server --scheme=http --port=5000 --host=0.0.0.0
+CMD service postgresql start && forum-server
