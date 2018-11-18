@@ -36,8 +36,9 @@ RUN /etc/init.d/postgresql start &&\
     psql docker -f base.sql &&\
     /etc/init.d/postgresql stop
 
-EXPOSE 5432
+#VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
-VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
+USER root
+EXPOSE 5432
 
 CMD service postgresql start && forum-server --scheme=http --port=5000 --host=0.0.0.0

@@ -6,9 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
-
-	"github.com/go-openapi/swag"
+	"encoding/json"
 )
 
 // ThreadUpdate Сообщение для обновления ветки обсуждения на форуме.
@@ -24,23 +22,18 @@ type ThreadUpdate struct {
 	Title string `json:"title,omitempty"`
 }
 
-// Validate validates this thread update
-func (m *ThreadUpdate) Validate(formats strfmt.Registry) error {
-	return nil
-}
-
 // MarshalBinary interface implementation
 func (m *ThreadUpdate) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
-	return swag.WriteJSON(m)
+	return json.Marshal(m)
 }
 
 // UnmarshalBinary interface implementation
 func (m *ThreadUpdate) UnmarshalBinary(b []byte) error {
 	var res ThreadUpdate
-	if err := swag.ReadJSON(b, &res); err != nil {
+	if err := json.Unmarshal(b, &res); err != nil {
 		return err
 	}
 	*m = res

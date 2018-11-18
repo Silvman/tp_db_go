@@ -6,11 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
-
-	"github.com/go-openapi/errors"
-	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
+	"encoding/json"
 )
 
 // Post Сообщение внутри ветки обсуждения на форуме.
@@ -25,7 +21,7 @@ type Post struct {
 	// Дата создания сообщения на форуме.
 	// Read Only: true
 	// Format: date-time
-	Created *strfmt.DateTime `json:"created,omitempty"`
+	Created string `json:"created,omitempty"`
 
 	// Идентификатор форума (slug) данного сообещния.
 	// Read Only: true
@@ -52,71 +48,22 @@ type Post struct {
 	Thread int32 `json:"thread,omitempty"`
 }
 
-// Validate validates this post
-func (m *Post) Validate(formats strfmt.Registry) error {
-	var res []error
-
-	if err := m.validateAuthor(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateCreated(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateMessage(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if len(res) > 0 {
-		return errors.CompositeValidationError(res...)
-	}
-	return nil
-}
-
-func (m *Post) validateAuthor(formats strfmt.Registry) error {
-
-	if err := validate.RequiredString("author", "body", string(m.Author)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Post) validateCreated(formats strfmt.Registry) error {
-
-	if swag.IsZero(m.Created) { // not required
-		return nil
-	}
-
-	if err := validate.FormatOf("created", "body", "date-time", m.Created.String(), formats); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Post) validateMessage(formats strfmt.Registry) error {
-
-	if err := validate.RequiredString("message", "body", string(m.Message)); err != nil {
-		return err
-	}
-
-	return nil
-}
+// Posts posts
+// swagger:model Posts
+type Posts []*Post
 
 // MarshalBinary interface implementation
 func (m *Post) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
-	return swag.WriteJSON(m)
+	return json.Marshal(m)
 }
 
 // UnmarshalBinary interface implementation
 func (m *Post) UnmarshalBinary(b []byte) error {
 	var res Post
-	if err := swag.ReadJSON(b, &res); err != nil {
+	if err := json.Unmarshal(b, &res); err != nil {
 		return err
 	}
 	*m = res

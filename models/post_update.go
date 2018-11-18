@@ -6,9 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
-
-	"github.com/go-openapi/swag"
+	"encoding/json"
 )
 
 // PostUpdate Сообщение для обновления сообщения внутри ветки на форуме.
@@ -21,23 +19,18 @@ type PostUpdate struct {
 	Message string `json:"message,omitempty"`
 }
 
-// Validate validates this post update
-func (m *PostUpdate) Validate(formats strfmt.Registry) error {
-	return nil
-}
-
 // MarshalBinary interface implementation
 func (m *PostUpdate) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
-	return swag.WriteJSON(m)
+	return json.Marshal(m)
 }
 
 // UnmarshalBinary interface implementation
 func (m *PostUpdate) UnmarshalBinary(b []byte) error {
 	var res PostUpdate
-	if err := swag.ReadJSON(b, &res); err != nil {
+	if err := json.Unmarshal(b, &res); err != nil {
 		return err
 	}
 	*m = res

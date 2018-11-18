@@ -6,11 +6,7 @@ package models
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
-	strfmt "github.com/go-openapi/strfmt"
-
-	"github.com/go-openapi/errors"
-	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
+	"encoding/json"
 )
 
 // Status status
@@ -34,80 +30,18 @@ type Status struct {
 	User int32 `json:"user"`
 }
 
-// Validate validates this status
-func (m *Status) Validate(formats strfmt.Registry) error {
-	var res []error
-
-	if err := m.validateForum(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validatePost(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateThread(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateUser(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if len(res) > 0 {
-		return errors.CompositeValidationError(res...)
-	}
-	return nil
-}
-
-func (m *Status) validateForum(formats strfmt.Registry) error {
-
-	if err := validate.Required("forum", "body", int32(m.Forum)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Status) validatePost(formats strfmt.Registry) error {
-
-	if err := validate.Required("post", "body", int64(m.Post)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Status) validateThread(formats strfmt.Registry) error {
-
-	if err := validate.Required("thread", "body", int32(m.Thread)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Status) validateUser(formats strfmt.Registry) error {
-
-	if err := validate.Required("user", "body", int32(m.User)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // MarshalBinary interface implementation
 func (m *Status) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
-	return swag.WriteJSON(m)
+	return json.Marshal(m)
 }
 
 // UnmarshalBinary interface implementation
 func (m *Status) UnmarshalBinary(b []byte) error {
 	var res Status
-	if err := swag.ReadJSON(b, &res); err != nil {
+	if err := json.Unmarshal(b, &res); err != nil {
 		return err
 	}
 	*m = res
