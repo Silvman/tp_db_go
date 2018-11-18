@@ -4,11 +4,24 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Silvman/tech-db-forum/models"
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
 )
 
-const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug=$1`
+const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug = $1`
+const qSelectUsersNickname = `select nickname from users where nickname = $1`
 const qInsertForum = `insert into forums (slug, title, owner) values ($1, $2, $3) returning owner`
+const qSelectSlug = `select slug from forums where slug = $1`
+
+const qSelectUsersSinceDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname < $2 order by u.nickname desc limit $3`
+const qSelectUsersDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname desc limit $2`
+const qSelectUsersSince = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname > $2 order by u.nickname limit $3`
+const qSelectUsers = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname limit $2`
+
+const qSelectThreadsCreatedDesc = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created <= $2::timestamptz order by created desc limit $3`
+const qSelectThreadsCreated = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created >= $2::timestamptz order by created limit $3`
+const qSelectThreadsDesc = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created desc limit $2`
+const qSelectThreads = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 order by created limit $2`
 
 func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
 	tx, err := self.pool.Begin()
@@ -31,7 +44,7 @@ func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
 	}
 
 	var nickname string
-	if err := tx.QueryRow(`select nickname from users where nickname = $1`, Forum.User).Scan(&nickname); err != nil {
+	if err := tx.QueryRow(qSelectUsersNickname, Forum.User).Scan(&nickname); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user with nickname: %s", Forum.User))
 	}
 
@@ -55,7 +68,7 @@ func (self *HandlerDB) ForumGetOne(Slug string) (*models.Forum, error) {
 	defer tx.Rollback()
 
 	forumExisting := models.Forum{}
-	if err = tx.QueryRow("select slug, title, posts, threads, owner from forums where slug = $1", Slug).
+	if err = tx.QueryRow(qSelectForumBySlug, Slug).
 		Scan(
 			&forumExisting.Slug,
 			&forumExisting.Title,
@@ -81,42 +94,30 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 	defer tx.Rollback()
 
 	var eSlug string
-	if err = tx.QueryRow("select slug from forums where slug = $1", Slug).Scan(&eSlug); err != nil {
+	if err = tx.QueryRow(qSelectSlug, Slug).Scan(&eSlug); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find forum with slug: %s", Slug))
 	}
 
-	args := []interface{}{}
-	query := `select id, title, message, votes, slug, created, forum, author from threads where forum = $1`
-	args = append(args, Slug)
-
-	if Since != nil {
-		args = append(args, *Since)
-		if Desc != nil && *Desc {
-			query += fmt.Sprintf(" and created <= $%d::timestamptz", len(args))
+	var rows *pgx.Rows
+	if Desc != nil && *Desc {
+		if Since != nil {
+			rows, _ = tx.Query(qSelectThreadsCreatedDesc, eSlug, *Since, *Limit)
 		} else {
-			query += fmt.Sprintf(" and created >= $%d::timestamptz", len(args))
+			rows, _ = tx.Query(qSelectThreadsDesc, eSlug, *Limit)
+		}
+	} else {
+		if Since != nil {
+			rows, _ = tx.Query(qSelectThreadsCreated, eSlug, *Since, *Limit)
+		} else {
+			rows, _ = tx.Query(qSelectThreads, eSlug, *Limit)
 		}
 	}
 
-	query += " order by created"
-
-	if Desc != nil && *Desc {
-		query += " desc"
-	}
-
-	if Limit != nil {
-		args = append(args, *Limit)
-		query += fmt.Sprintf(" limit $%d", len(args))
-	}
-
-	rows, err := tx.Query(query, args...)
-
-	existingThreads := models.Threads{}
+	existingThreads := make(models.Threads, 0, 20)
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
 		thread := models.Thread{}
-		err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author)
-		if err != nil {
+		if err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author); err != nil {
 			check(err)
 		}
 
@@ -126,8 +127,8 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 
 		existingThreads = append(existingThreads, &thread)
 	}
-	tx.Commit()
-	if err != nil {
+
+	if err = tx.Commit(); err != nil {
 		check(err)
 	}
 
@@ -142,43 +143,23 @@ func (self HandlerDB) ForumGetUsers(Slug string, Desc *bool, Since *string, Limi
 	defer tx.Rollback()
 
 	var eSlug string
-	if err = tx.QueryRow("select slug from forums where slug = $1", Slug).Scan(&eSlug); err != nil {
+	if err = tx.QueryRow(qSelectSlug, Slug).Scan(&eSlug); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find forum by slug: %s", Slug))
 	}
 
-	args := []interface{}{}
-	args = append(args, Slug)
-
-	query := `select u.nickname, fullname, about, email from forums_users
-join users u on forums_users.uid = u.id
-where forum = $1`
-
-	if Since != nil {
-		if Desc != nil && *Desc {
-			args = append(args, *Since)
-			query += fmt.Sprintf(" and u.nickname < $%d", len(args))
+	var rows *pgx.Rows
+	if Desc != nil && *Desc {
+		if Since != nil {
+			rows, _ = tx.Query(qSelectUsersSinceDesc, eSlug, *Since, *Limit)
 		} else {
-			args = append(args, *Since)
-			query += fmt.Sprintf(" and u.nickname > $%d", len(args))
+			rows, _ = tx.Query(qSelectUsersDesc, eSlug, *Limit)
 		}
-	}
-
-	query += " order by u.nickname"
-	if Desc != nil {
-		if *Desc {
-			query += " desc"
+	} else {
+		if Since != nil {
+			rows, _ = tx.Query(qSelectUsersSince, eSlug, *Since, *Limit)
+		} else {
+			rows, _ = tx.Query(qSelectUsers, eSlug, *Limit)
 		}
-	}
-
-	if Limit != nil {
-		args = append(args, *Limit)
-		query += fmt.Sprintf(" limit $%d", len(args))
-	}
-	check(query)
-
-	rows, err := tx.Query(query, args...)
-	if err != nil {
-		check(err)
 	}
 
 	existingUsers := models.Users{}
@@ -188,11 +169,9 @@ where forum = $1`
 		existingUsers = append(existingUsers, &t)
 	}
 
-	tx.Commit()
-	if err != nil {
+	if err = tx.Commit(); err != nil {
 		check(err)
 	}
 
 	return existingUsers, nil
-
 }

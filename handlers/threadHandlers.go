@@ -10,7 +10,7 @@ import (
 
 func CreatePosts(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
-	var pendingPosts []*models.Post
+	var pendingPosts models.Posts
 	err := json.Unmarshal(ctx.PostBody(), &pendingPosts)
 
 	payload, err := DB.PostsCreate(slug, pendingPosts)

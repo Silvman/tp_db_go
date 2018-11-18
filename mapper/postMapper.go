@@ -10,6 +10,14 @@ import (
 	"strings"
 )
 
+const qSelectPostById = `select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`
+const qSelectUserByNick = `select nickname, fullname, about, email from users where nickname = $1`
+const qSelectThreadById = `select id, title, message, votes, slug, created, forum, author from threads where id = $1`
+const qUpdatePost = `update posts set isEdit = true, message = $1 where id = $2 returning id, parent, message, isEdit, forum, created, thread, author`
+const qUpdateForumPosts = `update forums set posts = posts + $1 where slug = $2`
+const qSelectIdForumFromThreadsId = `select id, forum from threads where id = $1::bigint`
+const qSelectIdForumFromThreadsSlug = `select id, forum from threads where slug = $1`
+
 func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, error) {
 	tx, err := self.pool.Begin()
 	if err != nil {
@@ -20,7 +28,8 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 	ePostFull := models.PostFull{}
 	ePostFull.Post = &models.Post{}
 
-	if err := tx.QueryRow(`select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`, ID).
+	// todo а нам нужны все эти поля?
+	if err := tx.QueryRow(qSelectPostById, ID).
 		Scan(
 			&ePostFull.Post.ID,
 			&ePostFull.Post.Parent,
@@ -40,7 +49,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 			case "user":
 				{
 					ePostFull.Author = &models.User{}
-					if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, ePostFull.Post.Author).
+					if err := tx.QueryRow(qSelectUserByNick, ePostFull.Post.Author).
 						Scan(&ePostFull.Author.Nickname, &ePostFull.Author.Fullname, &ePostFull.Author.About, &ePostFull.Author.Email); err != nil {
 						check(err)
 					}
@@ -65,7 +74,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 				{
 					pgSlug := pgtype.Text{}
 					ePostFull.Thread = &models.Thread{}
-					if err := tx.QueryRow(`select id, title, message, votes, slug, created, forum, author from threads where id = $1`, ePostFull.Post.Thread).
+					if err := tx.QueryRow(qSelectThreadById, ePostFull.Post.Thread).
 						Scan(
 							&ePostFull.Thread.ID,
 							&ePostFull.Thread.Title,
@@ -105,7 +114,7 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 	ePost := models.Post{}
 	check("post_update")
 
-	if err := tx.QueryRow(`select id, parent, message, isEdit, forum, created, thread, author from posts where id = $1`, ID).Scan(
+	if err := tx.QueryRow(qSelectPostById, ID).Scan(
 		&ePost.ID,
 		&ePost.Parent,
 		&ePost.Message,
@@ -119,7 +128,7 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 	}
 
 	if Post.Message != "" && Post.Message != ePost.Message {
-		if err := tx.QueryRow(`update posts set isEdit = true, message = $1 where id = $2 returning id, parent, message, isEdit, forum, created, thread, author`, Post.Message, ID).Scan(
+		if err := tx.QueryRow(qUpdatePost, Post.Message, ID).Scan(
 			&ePost.ID,
 			&ePost.Parent,
 			&ePost.Message,
@@ -131,7 +140,6 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 		); err != nil {
 			check(err)
 		}
-
 	}
 
 	err = tx.Commit()
@@ -151,26 +159,21 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 
 	check("posts_create")
 
-	queryCheck := "select id, forum from threads where"
-	var currentErr string
-
-	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		currentErr = fmt.Sprintf("Can't find thread by slug: %s", SlugOrID)
-		queryCheck += " slug = $1"
-	} else {
-		currentErr = fmt.Sprintf("Can't find thread by id: %s", SlugOrID)
-		queryCheck += " id = $1::bigint"
-	}
-
 	var tIdCurrent int32
 	var tForumCurrent string
-	if err := tx.QueryRow(queryCheck, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
-		return nil, errors.New(currentErr)
+	if _, err := strconv.Atoi(SlugOrID); err != nil {
+		if err := tx.QueryRow(qSelectIdForumFromThreadsSlug, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
+		}
+	} else {
+		if err := tx.QueryRow(qSelectIdForumFromThreadsId, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
+		}
 	}
 
 	if len(Posts) == 0 {
 		check("nilPosts")
-		return Posts, nil
+		return nil, nil
 	}
 
 	query := `insert into posts (parent, message, thread, author, forum) values `
@@ -178,7 +181,6 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	var queryValues []string
 
 	args := make([]interface{}, 0, len(Posts)*5)
-	//var args []interface{}
 	parents := make([]string, 0, len(Posts))
 
 	if len(Posts) == 100 {
@@ -239,8 +241,9 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 
 	var par []string
 	var nopar []string
-	var auth []interface{}
-	var querries []string
+	auth := make([]interface{}, 0, len(Posts))
+	querries := make([]string, 0, len(Posts))
+
 	auth = append(auth, tForumCurrent)
 	for _, value := range Posts {
 		if rows.Next() {
@@ -265,6 +268,17 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	}
 	rows.Close()
 
+	if err := rows.Err(); err != nil {
+		if err.(pgx.PgError).Code == "23503" {
+			return nil, errors.New(fmt.Sprintf("Can't find post author by nickname"))
+		}
+
+		check("error on main query")
+		check(err)
+		check(err.(pgx.PgError).Error())
+		return nil, errors.New(fmt.Sprintf("Parent post was created in another thread"))
+	}
+
 	if len(par) != 0 {
 		tx.Exec(`update posts p set mPath = (select mPath from posts where id = p.parent) || id,
                  rootParent = (select rootParent from posts where id = p.parent)
@@ -275,23 +289,9 @@ where id in (` + strings.Join(par, ",") + ")")
 		tx.Exec("update posts set mPath[1] = id, rootParent = id where id in (" + strings.Join(nopar, ",") + ")")
 	}
 
-	tx.Exec("update forums set posts = posts + $1 where slug = $2", len(Posts), tForumCurrent)
+	tx.Exec(qUpdateForumPosts, len(Posts), tForumCurrent)
 
-	tx.Exec(`insert into forums_users (forum, uid) values `+strings.Join(querries, ",")+`on conflict do nothing`, auth...)
-
-	if err := rows.Err(); err != nil {
-		if err.(pgx.PgError).Code == "23503" {
-			//log.Println("f")
-			return nil, errors.New(fmt.Sprintf("Can't find post author by nickname"))
-		}
-
-		check("error on main query")
-		//log.Println(err)
-		//log.Println(err.(pgx.PgError))
-		check(err)
-		check(err.(pgx.PgError).Error())
-		return nil, errors.New(fmt.Sprintf("Parent post was created in another thread"))
-	}
+	tx.Exec(`insert into forums_users (forum, uid) values `+strings.Join(querries, ",")+` on conflict do nothing`, auth...)
 
 	err = tx.Commit()
 	if err != nil {

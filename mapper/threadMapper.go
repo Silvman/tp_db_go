@@ -4,11 +4,39 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Silvman/tech-db-forum/models"
+	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
-	"log"
 	"strconv"
 	"strings"
 )
+
+const qSelectThreadsForumTitle = `select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))`
+const qSelectThreadsForumSlug = `select id, title, message, votes, slug, created, forum, author from threads where (slug = $1)`
+
+const qInsertThread = `insert into threads (title, message, author, forum) values ($1, $2, $3, $4) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadCreated = `insert into threads (title, message, author, forum, created) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadCreatedSlug = `insert into threads (title, message, author, forum, created, slug) values ($1, $2, $3, $4, $5, $6) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThreadSlug = `insert into threads (title, message, author, forum, slug) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
+
+const qSelectThreadBySlug = `select id, title, message, votes, slug, created, forum, author from threads where slug = $1`
+
+const qSelectIdFromThreadsId = `select id from threads where id = $1::bigint`
+const qSelectIdFromThreadsSlug = `select id from threads where slug = $1`
+
+const qSelectPostsPTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id desc limit $2) order by rootParent desc, mPath`
+const qSelectPostsPT = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 order by id limit $2) order by mPath`
+const qSelectPostsPTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id < (select rootParent from posts where id = $2)  order by id desc limit $3) order by rootParent desc, mPath`
+const qSelectPostsPTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where rootParent in (select id from posts where thread = $1 and parent = 0 and id > (select rootParent from posts where id = $2)  order by id limit $3) order by mPath`
+
+const qSelectPostsTDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath desc limit $2`
+const qSelectPostsT = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by mPath limit $2`
+const qSelectPostsTSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath < (select mPath from posts where id = $2)  order by mPath desc limit $3`
+const qSelectPostsTSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and mPath > (select mPath from posts where id = $2)  order by mPath limit $3`
+
+const qSelectPostsFDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id desc limit $2`
+const qSelectPostsF = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id limit $2`
+const qSelectPostsFSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id < $2 order by id desc limit $3`
+const qSelectPostsFSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id > $2 order by id limit $3`
 
 func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.Thread, error) {
 	tx, err := self.pool.Begin()
@@ -17,93 +45,53 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 	}
 	defer tx.Rollback()
 
-	check("thread_create")
-
 	var slug string
-	if err := tx.QueryRow("select slug from forums where slug = $1", Slug).Scan(&slug); err != nil {
+	if err := tx.QueryRow(qSelectSlug, Slug).Scan(&slug); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find thread forum by slug: %s", Slug))
 	}
 
 	var author string
-	if err := tx.QueryRow("select nickname from users where nickname = $1", Thread.Author).Scan(&author); err != nil {
+	if err := tx.QueryRow(qSelectUsersNickname, Thread.Author).Scan(&author); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find thread author by nickname: %s", Thread.Author))
 	}
 
-	argsC := []interface{}{}
-	argsC = append(argsC, Thread.Title, Slug, Thread.Message)
-	queryConflict := "select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))"
-
-	if Thread.Slug != "" {
-		queryConflict += " or (slug = $4)"
-		argsC = append(argsC, Thread.Slug)
-	}
-
-	//pgTime := pgtype.Timestamptz{}
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
-	if err := tx.QueryRow(queryConflict, argsC...).
-		Scan(
-			&eThread.ID,
-			&eThread.Title,
-			&eThread.Message,
-			&eThread.Votes,
-			&pgSlug,
-			&eThread.Created,
-			&eThread.Forum,
-			&eThread.Author,
-		); err == nil {
+
+	if Thread.Slug == "" {
+		err = tx.QueryRow(qSelectThreadsForumTitle, Thread.Title, Slug, Thread.Message).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
+	} else {
+		err = tx.QueryRow(qSelectThreadsForumSlug, Thread.Slug).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
+	}
+
+	if err == nil {
 		if pgSlug.Status != pgtype.Null {
 			eThread.Slug = pgSlug.String
 		}
 
-		log.Printf("%v\n", eThread.Created)
-		//eThread.Created = &time.Time{}
-		//*eThread.Created = pgTime.Time
-		//
-		//if err := pgTime.AssignTo(eThread.Created); err != nil {
-		//	check(err)
-		//}
-
 		return &eThread, errors.New("already exists")
-	}
-
-	args := []interface{}{}
-
-	qFields := "title, message, author, forum"
-	qValues := "$1, $2, $3, $4"
-	args = append(args, Thread.Title, Thread.Message, Thread.Author, slug)
-
-	if !Thread.Created.IsZero() {
-		args = append(args, Thread.Created)
-		qFields += ", created"
-		qValues += fmt.Sprintf(", $%d", len(args))
-	}
-
-	if Thread.Slug != "" {
-		args = append(args, Thread.Slug)
-		qFields += ", slug"
-		qValues += fmt.Sprintf(", $%d", len(args))
-	}
-
-	query := "insert into threads (" + qFields + ") values (" + qValues + ") returning id, title, message, votes, slug, created, forum, author"
-
-	newThread := models.Thread{}
-
-	if err := tx.QueryRow(query, args...).
-		Scan(
-			&newThread.ID,
-			&newThread.Title,
-			&newThread.Message,
-			&newThread.Votes,
-			&pgSlug,
-			&newThread.Created,
-			&newThread.Forum,
-			&newThread.Author,
-		); err != nil {
+	} else {
 		check(err)
 	}
 
-	//tgtimeToString(&pgTime, newThread.Created)
+	newThread := models.Thread{}
+	if Thread.Created.IsZero() {
+		if Thread.Slug != "" {
+			err = tx.QueryRow(qInsertThreadSlug, Thread.Title, Thread.Message, Thread.Author, slug, Thread.Slug).Scan(&newThread.ID, &newThread.Title, &newThread.Message, &newThread.Votes, &pgSlug, &newThread.Created, &newThread.Forum, &newThread.Author)
+		} else {
+			err = tx.QueryRow(qInsertThread, Thread.Title, Thread.Message, Thread.Author, slug).Scan(&newThread.ID, &newThread.Title, &newThread.Message, &newThread.Votes, &pgSlug, &newThread.Created, &newThread.Forum, &newThread.Author)
+		}
+	} else {
+		if Thread.Slug != "" {
+			err = tx.QueryRow(qInsertThreadCreatedSlug, Thread.Title, Thread.Message, Thread.Author, slug, Thread.Created, Thread.Slug).Scan(&newThread.ID, &newThread.Title, &newThread.Message, &newThread.Votes, &pgSlug, &newThread.Created, &newThread.Forum, &newThread.Author)
+		} else {
+			err = tx.QueryRow(qInsertThreadCreated, Thread.Title, Thread.Message, Thread.Author, slug, Thread.Created).Scan(&newThread.ID, &newThread.Title, &newThread.Message, &newThread.Votes, &pgSlug, &newThread.Created, &newThread.Forum, &newThread.Author)
+		}
+	}
+
+	if err != nil {
+		check(err)
+	}
 
 	if pgSlug.Status != pgtype.Null {
 		newThread.Slug = pgSlug.String
@@ -118,7 +106,6 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 }
 
 func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
-	self.checkVacuum()
 	tx, err := self.pool.Begin()
 	if err != nil {
 		check(err)
@@ -129,36 +116,19 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
 
-	query := "select id, title, message, votes, slug, created, forum, author from threads where"
-	var currentErr string
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		currentErr = fmt.Sprintf("Can't find thread by slug: %s", SlugOrID)
-		query += " slug = $1"
+		if err := tx.QueryRow(qSelectThreadBySlug, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
+		}
 	} else {
-		currentErr = fmt.Sprintf("Can't find thread by id: %s", SlugOrID)
-		query += " id = $1::bigint"
+		if err := tx.QueryRow(qSelectThreadById, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
+		}
 	}
 
-	if err := tx.QueryRow(query, SlugOrID).
-		Scan(
-			&eThread.ID,
-			&eThread.Title,
-			&eThread.Message,
-			&eThread.Votes,
-			&pgSlug,
-			&eThread.Created,
-			&eThread.Forum,
-			&eThread.Author,
-		); err != nil {
-		return nil, errors.New(currentErr)
-	}
-
-	// парсим время и слаг
 	if pgSlug.Status != pgtype.Null {
 		eThread.Slug = pgSlug.String
 	}
-
-	//tgtimeToString(&pgTime, eThread.Created)
 
 	err = tx.Commit()
 	if err != nil {
@@ -175,137 +145,81 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 	}
 	defer tx.Rollback()
 
-	check("get_posts")
-
-	queryCheck := "select id from threads where"
-	var currentErr string
-
-	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		currentErr = fmt.Sprintf("Can't find thread by slug: %s", SlugOrID)
-		queryCheck += " slug = $1"
-	} else {
-		currentErr = fmt.Sprintf("Can't find thread by id: %s", SlugOrID)
-		queryCheck += " id = $1"
-	}
-
 	var tId int32
-	if err := tx.QueryRow(queryCheck, SlugOrID).Scan(&tId); err != nil {
-		return nil, errors.New(currentErr)
+	if _, err := strconv.Atoi(SlugOrID); err != nil {
+		if err := tx.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
+		}
+	} else {
+		if err := tx.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
+		}
 	}
 
-	check("thread_valid")
-
-	args := []interface{}{}
-	//var qValues []string
-
-	args = append(args, tId)
-
-	var query string
-
+	var rows *pgx.Rows
 	switch *Sort {
 	default:
 		fallthrough
+
 	case "flat":
 		{
-			query = "select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1"
-
-			if Since != nil {
-				args = append(args, *Since)
-				if Desc != nil && *Desc {
-					query += fmt.Sprintf(" and id < $%d", len(args))
-				} else {
-					query += fmt.Sprintf(" and id > $%d", len(args))
-				}
-			}
-
 			if Desc != nil && *Desc {
-				query += " order by id desc"
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsFSinceDesc, tId, *Since, *Limit)
+				} else {
+					rows, err = tx.Query(qSelectPostsFDesc, tId, *Limit)
+				}
 			} else {
-				query += " order by id"
-			}
-
-			if Limit != nil {
-				args = append(args, *Limit)
-				query += fmt.Sprintf(" limit $%d", len(args))
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsFSince, tId, *Since, *Limit)
+				} else {
+					rows, err = tx.Query(qSelectPostsF, tId, *Limit)
+				}
 			}
 		}
 
 	case "tree":
 		{
-			query = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1`
-
-			if Since != nil {
-				args = append(args, *Since)
-				if Desc != nil && *Desc {
-					query += fmt.Sprintf(" and mPath < (select mPath from posts where id = $%d) ", len(args))
-				} else {
-					query += fmt.Sprintf(" and mPath > (select mPath from posts where id = $%d) ", len(args))
-				}
-			}
-
 			if Desc != nil && *Desc {
-				query += " order by mPath desc"
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsTSinceDesc, tId, *Since, *Limit)
+				} else {
+					rows, err = tx.Query(qSelectPostsTDesc, tId, *Limit)
+				}
 			} else {
-				query += " order by mPath"
-			}
-
-			if Limit != nil {
-				args = append(args, *Limit)
-				query += fmt.Sprintf(" limit $%d", len(args))
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsTSince, tId, *Since, *Limit)
+				} else {
+					rows, err = tx.Query(qSelectPostsT, tId, *Limit)
+				}
 			}
 		}
 
 	case "parent_tree":
 		{
-			query = `select id, parent, message, isEdit, forum, created, thread, author
-			from posts where rootParent in
-			(select id from posts where thread = $1 and parent = 0`
-
-			if Since != nil {
-				args = append(args, *Since)
-				if Desc != nil && *Desc {
-					query += fmt.Sprintf(" and id < (select rootParent from posts where id = $%d) ", len(args))
+			if Desc != nil && *Desc {
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsPTSinceDesc, tId, *Since, *Limit)
 				} else {
-					query += fmt.Sprintf(" and id > (select rootParent from posts where id = $%d) ", len(args))
+					rows, err = tx.Query(qSelectPostsPTDesc, tId, *Limit)
 				}
-			}
-
-			if Desc != nil && *Desc {
-				query += " order by id desc"
 			} else {
-				query += " order by id"
-			}
-
-			if Limit != nil {
-				args = append(args, *Limit)
-				query += fmt.Sprintf(" limit $%d", len(args))
-			}
-
-			query += `)`
-
-			if Desc != nil && *Desc {
-				query += " order by rootParent desc, mPath"
-			} else {
-				query += " order by mPath"
+				if Since != nil {
+					rows, err = tx.Query(qSelectPostsPTSince, tId, *Since, *Limit)
+				} else {
+					rows, err = tx.Query(qSelectPostsPT, tId, *Limit)
+				}
 			}
 		}
 	}
 
-	check("- begin -----")
-	check(query)
-	check("- end -------")
-
-	rows, err := tx.Query(query, args...)
 	if err != nil {
 		check(err)
 	}
 
-	//log.Printf("%#v\n", rows)
-
 	fetchPosts := models.Posts{}
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
-		check("fit\n")
 		post := models.Post{}
 		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &post.Created, &post.Thread, &post.Author)
 		if err != nil {
@@ -319,9 +233,6 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		fetchPosts = append(fetchPosts, &post)
 	}
 
-	rows.Close()
-
-	check("precommit")
 	if err = tx.Commit(); err != nil {
 		check(err)
 	}
@@ -336,22 +247,15 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 	}
 	defer tx.Rollback()
 
-	check("thread_update")
-
-	query := "select id from threads where"
-	var currentErr string
-
-	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		currentErr = fmt.Sprintf("Can't find thread by slug: %s", SlugOrID)
-		query += " slug = $1"
-	} else {
-		currentErr = fmt.Sprintf("Can't find thread by id: %s", SlugOrID)
-		query += " id = $1"
-	}
-
 	var tId int32
-	if err := tx.QueryRow(query, SlugOrID).Scan(&tId); err != nil {
-		return nil, errors.New(currentErr)
+	if _, err := strconv.Atoi(SlugOrID); err != nil {
+		if err := tx.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
+		}
+	} else {
+		if err := tx.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
+		}
 	}
 
 	if Thread.Message == "" && Thread.Title == "" {
@@ -373,7 +277,7 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 
 	pgSlug := pgtype.Text{}
 	updThread := models.Thread{}
-	query = fmt.Sprintf("update threads set "+strings.Join(qValues, ",")+" where id = %d returning id, title, message, votes, slug, created, forum, author", tId)
+	query := fmt.Sprintf("update threads set "+strings.Join(qValues, ",")+" where id = %d returning id, title, message, votes, slug, created, forum, author", tId)
 	if err := tx.QueryRow(query, args...).Scan(
 		&updThread.ID,
 		&updThread.Title,
@@ -405,27 +309,19 @@ func (self HandlerDB) ThreadVote(SlugOrID string, Vote *models.Vote) (*models.Th
 	}
 	defer tx.Rollback()
 
-	check("vote")
-
-	query := "select id from threads where"
-	var currentErr string
-	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		currentErr = fmt.Sprintf("Can't find thread by slug: %s", SlugOrID)
-		query += " slug = $1"
-	} else {
-		currentErr = fmt.Sprintf("Can't find thread by id: %s", SlugOrID)
-		query += " id = $1::bigint"
-	}
-
 	var tId int32
-	if err := tx.QueryRow(query, SlugOrID).Scan(&tId); err != nil {
-		return nil, errors.New(currentErr)
+	if _, err := strconv.Atoi(SlugOrID); err != nil {
+		if err := tx.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
+		}
+	} else {
+		if err := tx.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
+		}
 	}
 
 	if _, err := tx.Exec("insert into votes (author, thread, vote) values ($1, $2, $3) on conflict (author, thread) do update set vote = $3", Vote.Nickname, tId, Vote.Voice); err != nil {
-		check(err)
-		currentErr = fmt.Sprintf("Can't find user by nickname: %s", Vote.Nickname)
-		return nil, errors.New(currentErr)
+		return nil, errors.New(fmt.Sprintf("Can't find user by nickname: %s", Vote.Nickname))
 	}
 
 	pgSlug := pgtype.Text{}
