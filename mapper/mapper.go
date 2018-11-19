@@ -30,10 +30,10 @@ const qSelectIdForumFromThreadsSlug = `select id, forum from threads where slug 
 const qSelectThreadsForumTitle = `select id, title, message, votes, slug, created, forum, author from threads where ((title = $1) and (forum = $2) and (message = $3))`
 const qSelectThreadsForumSlug = `select id, title, message, votes, slug, created, forum, author from threads where (slug = $1)`
 
-const qInsertThread = `insert into threads (title, message, author, forum) values ($1, $2, $3, $4) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadCreated = `insert into threads (title, message, author, forum, created) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadCreatedSlug = `insert into threads (title, message, author, forum, created, slug) values ($1, $2, $3, $4, $5, $6) returning id, title, message, votes, slug, created, forum, author`
-const qInsertThreadSlug = `insert into threads (title, message, author, forum, slug) values ($1, $2, $3, $4, $5) returning id, title, message, votes, slug, created, forum, author`
+const qInsertThread = `insert into threads (title, message, author, forum) values ($1, $2, $3, $4) returning id, created`
+const qInsertThreadCreated = `insert into threads (title, message, author, forum, created) values ($1, $2, $3, $4, $5) returning id, created`
+const qInsertThreadCreatedSlug = `insert into threads (title, message, author, forum, created, slug) values ($1, $2, $3, $4, $5, $6) returning id, created`
+const qInsertThreadSlug = `insert into threads (title, message, author, forum, slug) values ($1, $2, $3, $4, $5) returning id, created`
 
 const qSelectThreadBySlug = `select id, title, message, votes, slug, created, forum, author from threads where slug = $1`
 
@@ -141,10 +141,6 @@ func NewHandler() (*HandlerDB, error) {
 	var err = handler.Connect(config)
 
 	return handler, err
-}
-
-func check(err interface{}) {
-	//log.Println(err)
 }
 
 func (self *HandlerDB) Vacuum() {

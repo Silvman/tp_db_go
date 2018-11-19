@@ -6,6 +6,7 @@ import (
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -37,7 +38,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 					ePostFull.Author = &models.User{}
 					if err := self.pool.QueryRow(qSelectUserByNick, ePostFull.Post.Author).
 						Scan(&ePostFull.Author.Nickname, &ePostFull.Author.Fullname, &ePostFull.Author.About, &ePostFull.Author.Email); err != nil {
-						check(err)
+						//log.Println(err)
 					}
 				}
 
@@ -52,7 +53,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 							&ePostFull.Forum.Threads,
 							&ePostFull.Forum.User,
 						); err != nil {
-						check(err)
+						//log.Println(err)
 					}
 				}
 
@@ -71,7 +72,7 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 							&ePostFull.Thread.Forum,
 							&ePostFull.Thread.Author,
 						); err != nil {
-						check(err)
+						//log.Println(err)
 					}
 
 					if pgSlug.Status != pgtype.Null {
@@ -86,16 +87,9 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 }
 
 func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
 	ePost := models.Post{}
-	check("post_update")
 
-	if err := tx.QueryRow(qSelectPostById, ID).Scan(
+	if err := self.pool.QueryRow(qSelectPostById, ID).Scan(
 		&ePost.ID,
 		&ePost.Parent,
 		&ePost.Message,
@@ -109,7 +103,7 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 	}
 
 	if Post.Message != "" && Post.Message != ePost.Message {
-		if err := tx.QueryRow(qUpdatePost, Post.Message, ID).Scan(
+		if err := self.pool.QueryRow(qUpdatePost, Post.Message, ID).Scan(
 			&ePost.ID,
 			&ePost.Parent,
 			&ePost.Message,
@@ -119,13 +113,8 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 			&ePost.Thread,
 			&ePost.Author,
 		); err != nil {
-			check(err)
+			//log.Println(err)
 		}
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		check(err)
 	}
 
 	return &ePost, nil
@@ -134,11 +123,9 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.Posts, error) {
 	tx, err := self.pool.Begin()
 	if err != nil {
-		check(err)
+		log.Println(err)
 	}
 	defer tx.Rollback()
-
-	check("posts_create")
 
 	var tIdCurrent int32
 	var tForumCurrent string
@@ -153,7 +140,6 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	}
 
 	if len(Posts) == 0 {
-		check("nilPosts")
 		return nil, nil
 	}
 
@@ -185,19 +171,17 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 
 	if len(parents) != 0 {
 		rows, err := tx.Query(fmt.Sprint(`select thread from posts where id in (`, strings.Join(parents, ","), ")"))
-		check(err)
-
-		check(fmt.Sprint(`select thread from posts where id in (`, strings.Join(parents, ","), ")"))
 		hasP := false
 
 		for rows.Next() {
 			hasP = true
-			check("select parent thread")
 
 			var tId int32
 			err = rows.Scan(&tId)
-			check(err)
-			check(tId)
+			if err != nil {
+				//log.Println(err)
+				//log.Println(tId)
+			}
 
 			if tId != tIdCurrent {
 				return nil, errors.New(fmt.Sprintf("Parent post was created in another thread"))
@@ -210,9 +194,6 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	}
 
 	query += strings.Join(queryValues, ",") + queryEnd
-
-	check(query)
-	//log.Printf("%#v\n", args)
 
 	if len(Posts) == 100 {
 		query = "bigInsert"
@@ -228,10 +209,11 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	auth = append(auth, tForumCurrent)
 	for _, value := range Posts {
 		if rows.Next() {
-			check("insert post")
 
 			err = rows.Scan(&value.ID, &value.IsEdited, &value.Created)
-			check(err)
+			if err != nil {
+				//log.Println(err)
+			}
 
 			if value.Parent != 0 {
 				par = append(par, strconv.Itoa(int(value.ID)))
@@ -254,9 +236,9 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 			return nil, errors.New(fmt.Sprintf("Can't find post author by nickname"))
 		}
 
-		check("error on main query")
-		check(err)
-		check(err.(pgx.PgError).Error())
+		log.Println("error on main query")
+		log.Println(err)
+		log.Println(err.(pgx.PgError).Error())
 		return nil, errors.New(fmt.Sprintf("Parent post was created in another thread"))
 	}
 
@@ -276,7 +258,7 @@ where id in (` + strings.Join(par, ",") + ")")
 
 	err = tx.Commit()
 	if err != nil {
-		check(err)
+		log.Println(err)
 	}
 
 	return Posts, nil

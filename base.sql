@@ -39,7 +39,7 @@ create table threads (
   votes   bigint                   default 0,
   slug    citext,
   created timestamp with time zone default current_timestamp,
-  forum   citext references forums (slug),
+  forum   citext,
   author  citext collate "ucs_basic" references users (nickname),
 
   constraint slug_unique unique (slug)

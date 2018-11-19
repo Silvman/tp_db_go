@@ -4,11 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Silvman/tech-db-forum/models"
-	"strings"
 )
 
+const qInsertUser = `insert into users values ($1, $2, $3, $4)`
+const qSelectUserByNickEmail = `select nickname, fullname, about, email from users where nickname = $1 or email = $2`
+
+const qUpdateUserFullname = `update users set fullname = $1 where nickname = $2`
+const qUpdateUserFullnameAbout = `update users set fullname = $1,about = $2 where nickname = $3`
+const qUpdateUserFullnameEmail = `update users set fullname = $1,email = $2 where nickname = $3`
+const qUpdateUserFullnameEmailAbout = `update users set fullname = $1,email = $2,about = $3 where nickname = $4`
+const qUpdateUserAbout = `update users set about = $1 where nickname = $2`
+const qUpdateUserEmail = `update users set email = $1 where nickname = $2`
+const qUpdateUserEmailAbout = `update users set email = $1,about = $2 where nickname = $3`
+
+//returning nickname, fullname, about, email
+
 func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models.Users, error) {
-	rows, _ := self.pool.Query(`select nickname, fullname, about, email from users where nickname = $1 or email = $2`, Nickname, Profile.Email)
+	rows, _ := self.pool.Query(qSelectUserByNickEmail, Nickname, Profile.Email)
 	eUsers := models.Users{}
 	for rows.Next() {
 		eUser := models.User{}
@@ -20,9 +32,9 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 		return &eUsers, errors.New("already exists")
 	}
 
-	_, err := self.pool.Exec(`insert into users values ($1, $2, $3, $4)`, Nickname, Profile.Fullname, Profile.About, Profile.Email)
+	_, err := self.pool.Exec(qInsertUser, Nickname, Profile.Fullname, Profile.About, Profile.Email)
 	if err != nil {
-		check(err)
+		//log.Println(err)
 	}
 
 	Profile.Nickname = Nickname
@@ -33,7 +45,7 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 
 func (self HandlerDB) UserGetOne(Nickname string) (*models.User, error) {
 	eUser := models.User{}
-	if err := self.pool.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, Nickname).
+	if err := self.pool.QueryRow(qSelectUserByNick, Nickname).
 		Scan(&eUser.Nickname, &eUser.Fullname, &eUser.About, &eUser.Email); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname: %s", Nickname))
 	}
@@ -42,63 +54,54 @@ func (self HandlerDB) UserGetOne(Nickname string) (*models.User, error) {
 }
 
 func (self HandlerDB) UserUpdate(Nickname string, Profile *models.UserUpdate) (*models.User, error) {
-	tx, err := self.pool.Begin()
-	if err != nil {
-		check(err)
-	}
-	defer tx.Rollback()
-
-	check("user_update")
-
 	tempUser := models.User{}
-	if err := tx.QueryRow(`select nickname, fullname, about, email from users where nickname = $1`, Nickname).
-		Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
+	if err := self.pool.QueryRow(qSelectUserByNick, Nickname).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname"))
-
 	}
 
-	query := `update users set `
-	var queryParams []string
-
-	args := []interface{}{}
-	if Profile.Fullname != "" || Profile.Email != "" || Profile.About != "" {
-		if Profile.Fullname != "" {
-			tempUser.Fullname = Profile.Fullname
-			args = append(args, Profile.Fullname)
-			queryParams = append(queryParams, fmt.Sprintf("fullname = $%d", len(args)))
-		}
-
-		if Profile.Email != "" {
-			var nickname string
-			if err := tx.QueryRow(`select nickname from users where email = $1`, Profile.Email).Scan(&nickname); err == nil {
-				return nil, errors.New(fmt.Sprintf("This email is already registered by user: %s", nickname))
-			}
-
-			tempUser.Email = Profile.Email
-			args = append(args, Profile.Email)
-			queryParams = append(queryParams, fmt.Sprintf("email = $%d", len(args)))
-
-		}
-
+	var err error
+	if Profile.Email != "" {
 		if Profile.About != "" {
-			tempUser.About = Profile.About
-			args = append(args, Profile.About)
-			queryParams = append(queryParams, fmt.Sprintf("about = $%d", len(args)))
+			if Profile.Fullname != "" {
+				_, err = self.pool.Exec(qUpdateUserFullnameEmailAbout, Profile.Fullname, Profile.Email, Profile.About, Nickname)
+				tempUser.Fullname = Profile.Fullname
+				tempUser.About = Profile.About
+				tempUser.Email = Profile.Email
+			} else {
+				_, err = self.pool.Exec(qUpdateUserEmailAbout, Profile.Email, Profile.About, Nickname)
+				tempUser.About = Profile.About
+				tempUser.Email = Profile.Email
+			}
+		} else {
+			if Profile.Fullname != "" {
+				_, err = self.pool.Exec(qUpdateUserFullnameEmail, Profile.Fullname, Profile.Email, Nickname)
+				tempUser.Fullname = Profile.Fullname
+				tempUser.Email = Profile.Email
+			} else {
+				_, err = self.pool.Exec(qUpdateUserEmail, Profile.Email, Nickname)
+				tempUser.Email = Profile.Email
+			}
 		}
 	} else {
-		return &tempUser, nil
+		if Profile.About != "" {
+			if Profile.Fullname != "" {
+				_, err = self.pool.Exec(qUpdateUserFullnameAbout, Profile.Fullname, Profile.About, Nickname)
+				tempUser.Fullname = Profile.Fullname
+				tempUser.About = Profile.About
+			} else {
+				_, err = self.pool.Exec(qUpdateUserAbout, Profile.About, Nickname)
+				tempUser.About = Profile.About
+			}
+		} else {
+			if Profile.Fullname != "" {
+				_, err = self.pool.Exec(qUpdateUserFullname, Profile.Fullname, Nickname)
+				tempUser.Fullname = Profile.Fullname
+			}
+		}
 	}
 
-	args = append(args, Nickname)
-	query += strings.Join(queryParams, ",") + fmt.Sprintf(" where nickname = $%d", len(args)) + " returning nickname, fullname, about, email"
-
-	if err := tx.QueryRow(query, args...).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
-		check(err)
-	}
-
-	err = tx.Commit()
 	if err != nil {
-		check(err)
+		return nil, errors.New(fmt.Sprintf("This email is already registered"))
 	}
 
 	return &tempUser, nil

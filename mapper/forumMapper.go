@@ -9,7 +9,6 @@ import (
 )
 
 func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
-	check("forum_create")
 	forumExisting := models.Forum{}
 	if err := self.pool.QueryRow(qSelectForumBySlug, Forum.Slug).
 		Scan(
@@ -29,7 +28,7 @@ func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
 
 	if err := self.pool.QueryRow(qInsertForum, Forum.Slug, Forum.Title, nickname).
 		Scan(&Forum.User); err != nil {
-		check(err)
+		//log.Println(err)
 	}
 
 	return Forum, nil
@@ -77,7 +76,7 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 	for rows.Next() {
 		thread := models.Thread{}
 		if err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author); err != nil {
-			check(err)
+			//log.Println(err)
 		}
 
 		if pgSlug.Status != pgtype.Null {
