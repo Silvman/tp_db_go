@@ -59,15 +59,15 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 	var rows *pgx.Rows
 	if Desc != nil && *Desc {
 		if Since != nil {
-			rows, _ = self.pool.Query(qSelectThreadsCreatedDesc, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsCreatedDesc.Name, eSlug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(qSelectThreadsDesc, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsDesc.Name, eSlug, *Limit)
 		}
 	} else {
 		if Since != nil {
-			rows, _ = self.pool.Query(qSelectThreadsCreated, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsCreated.Name, eSlug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(qSelectThreads, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreads.Name, eSlug, *Limit)
 		}
 	}
 
@@ -98,15 +98,15 @@ func (self HandlerDB) ForumGetUsers(Slug string, Desc *bool, Since *string, Limi
 	var rows *pgx.Rows
 	if Desc != nil && *Desc {
 		if Since != nil {
-			rows, _ = self.pool.Query(qSelectUsersSinceDesc, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersSinceDesc.Name, eSlug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(qSelectUsersDesc, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersDesc.Name, eSlug, *Limit)
 		}
 	} else {
 		if Since != nil {
-			rows, _ = self.pool.Query(qSelectUsersSince, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersSince.Name, eSlug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(qSelectUsers, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsers.Name, eSlug, *Limit)
 		}
 	}
 

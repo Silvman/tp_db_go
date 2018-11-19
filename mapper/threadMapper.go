@@ -101,15 +101,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsFSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsFSinceDesc", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsFDesc, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsFDesc", tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsFSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsFSince", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsF, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsF", tId, *Limit)
 				}
 			}
 		}
@@ -118,15 +118,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsTSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsTSinceDesc", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsTDesc, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsTDesc", tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsTSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsTSince", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsT, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsT", tId, *Limit)
 				}
 			}
 		}
@@ -135,15 +135,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsPTSinceDesc, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsPTSinceDesc", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsPTDesc, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsPTDesc", tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query(qSelectPostsPTSince, tId, *Since, *Limit)
+					rows, err = self.pool.Query("qSelectPostsPTSince", tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query(qSelectPostsPT, tId, *Limit)
+					rows, err = self.pool.Query("qSelectPostsPT", tId, *Limit)
 				}
 			}
 		}
