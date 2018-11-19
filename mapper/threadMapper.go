@@ -94,8 +94,6 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 	var err error
 	var rows *pgx.Rows
 
-	log.Println("send querry")
-
 	switch *Sort {
 	default:
 		fallthrough
@@ -155,14 +153,11 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println("get query")
 
 	fetchPosts := models.Posts{}
 	pgSlug := pgtype.Text{}
 
-	log.Println("append values")
 	for rows.Next() {
-		log.Println("append value")
 		post := models.Post{}
 		err := rows.Scan(&post.ID, &post.Parent, &post.Message, &post.IsEdited, &pgSlug, &post.Created, &post.Thread, &post.Author)
 		if err != nil {
@@ -175,7 +170,6 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 
 		fetchPosts = append(fetchPosts, &post)
 	}
-	log.Println("done append values")
 
 	return &fetchPosts, nil
 }

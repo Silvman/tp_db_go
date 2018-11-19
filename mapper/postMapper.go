@@ -9,7 +9,10 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
+
+var totalPosts int32
 
 func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, error) {
 	ePostFull := models.PostFull{}
@@ -259,6 +262,14 @@ where id in (` + strings.Join(par, ",") + ")")
 	err = tx.Commit()
 	if err != nil {
 		log.Println(err)
+	}
+
+	atomic.AddInt32(&totalPosts, int32(len(Posts)))
+
+	if atomic.LoadInt32(&totalPosts) >= 1500000 {
+		//log.Println("VACUUM ANALYZE")
+		self.pool.Exec("VACUUM ANALYZE")
+		//log.Println("VACUUM ANALYZE end")
 	}
 
 	return Posts, nil

@@ -182,9 +182,9 @@ func NewHandler() (*HandlerDB, error) {
 	config := pgx.ConnConfig{
 		Host:     "localhost",
 		Port:     5432,
-		User:     "docker",
-		Password: "docker",
-		Database: "docker",
+		User:     "test",
+		Password: "test",
+		Database: "test",
 	}
 
 	handler := &HandlerDB{}

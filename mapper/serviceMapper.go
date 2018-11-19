@@ -3,6 +3,7 @@ package mapper
 import (
 	"github.com/Silvman/tech-db-forum/models"
 	"log"
+	"sync/atomic"
 )
 
 func (self HandlerDB) Clear() error {
@@ -19,5 +20,8 @@ func (self HandlerDB) Status() *models.Status {
 	self.pool.QueryRow("select count(*) from forums").Scan(&status.Forum)
 	self.pool.QueryRow("select count(*) from threads").Scan(&status.Thread)
 	self.pool.QueryRow("select count(*) from posts").Scan(&status.Post)
+
+	atomic.StoreInt32(&totalPosts, 0)
+
 	return &status
 }

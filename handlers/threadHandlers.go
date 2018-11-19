@@ -58,8 +58,6 @@ func UpdateThreadDetails(ctx *fasthttp.RequestCtx) {
 func GetPosts(ctx *fasthttp.RequestCtx) {
 	slug := ctx.UserValue("slug_id").(string)
 
-	log.Println("start getting posts ", ctx.Path())
-
 	sort := string(ctx.QueryArgs().Peek("sort"))
 
 	limitStr := string(ctx.QueryArgs().Peek("limit"))
@@ -99,8 +97,6 @@ func GetPosts(ctx *fasthttp.RequestCtx) {
 	}
 
 	WriteResponseJSON(ctx, fasthttp.StatusOK, body)
-
-	log.Println("send posts", ctx.Path())
 }
 
 func CreateThreadVote(ctx *fasthttp.RequestCtx) {
