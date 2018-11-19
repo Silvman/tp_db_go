@@ -163,16 +163,6 @@ func (self *HandlerDB) Connect(config pgx.ConnConfig) (err error) {
 	self.psqSelectUsersSince, err = self.pool.Prepare("qSelectUsersSince", qSelectUsersSince)
 	self.psqSelectUsers, err = self.pool.Prepare("qSelectUsers", qSelectUsers)
 
-	//tick := time.NewTicker(45 * time.Second)
-	//go func() {
-	//	for range tick.C {
-	//		log.Println("vacuum")
-	//		self.Vacuum()
-	//		log.Println("vacuum end")
-	//
-	//	}
-	//}()
-
 	// todo gsh
 
 	return err

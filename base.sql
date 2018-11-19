@@ -26,10 +26,6 @@ create table forums_users (
 
   primary key (forum, uid)
 );
---
--- -- ?
--- create index on forums_users (uid);
--- -- create index on forums_users(forum);
 
 
 create table threads (
@@ -68,15 +64,8 @@ create table votes (
   constraint author_thread_unique unique (thread, author)
 );
 
--- create index on threads (forum);
 create index on threads (forum, created);
--- create index on threads (author);
-
--- create index on votes (thread);
-
--- create index on posts (parent);
 create index on posts (thread, id);
--- create index on posts (author);
 create index on posts (rootParent);
 
 create or replace function establish_forum_users()
