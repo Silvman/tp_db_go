@@ -33,7 +33,7 @@ RUN echo "synchronous_commit = off" >> /etc/postgresql/$PGVER/main/postgresql.co
 RUN echo "fsync = off" >> /etc/postgresql/$PGVER/main/postgresql.conf
 RUN echo "full_page_writes = off" >> /etc/postgresql/$PGVER/main/postgresql.conf
 RUN echo "autovacuum = off" >> /etc/postgresql/$PGVER/main/postgresql.conf
-#RUN echo "shared_buffers = 300MB" >> /etc/postgresql/$PGVER/main/postgresql.conf
+RUN echo "shared_buffers = 64MB" >> /etc/postgresql/$PGVER/main/postgresql.conf
 
 RUN /etc/init.d/postgresql start &&\
     psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker';" &&\
