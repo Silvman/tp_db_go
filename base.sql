@@ -68,7 +68,7 @@ create table votes (
   constraint author_thread_unique unique (thread, author)
 );
 
-create index on threads (forum);
+-- create index on threads (forum);
 create index on threads (forum, created);
 -- create index on threads (author);
 
