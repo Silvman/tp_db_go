@@ -76,6 +76,7 @@ create index on threads (forum);
 
 -- create index on posts (parent);
 create index on posts (thread, id);
+create index on posts (thread, mPath);
 -- create index on posts (author);
 create index on posts (rootParent);
 
