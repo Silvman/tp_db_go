@@ -1,5 +1,5 @@
 create extension if not exists citext;
-create table users (
+create table if not exists users (
   nickname citext collate "ucs_basic" primary key,
   fullname text default '',
   about    text default '',
@@ -10,7 +10,7 @@ create table users (
 
 cluster users using users_pkey;
 
-create table forums (
+create table if not exists forums (
   slug    citext primary key,
   title   text not null,
   owner   citext references users (nickname),
@@ -20,14 +20,19 @@ create table forums (
 
 cluster forums using forums_pkey;
 
-create table forums_users (
-  forum citext collate "ucs_basic",
+create table if not exists forums_users (
+  forum    citext collate "ucs_basic",
   nickname citext collate "ucs_basic",
+  fullname text default '',
+  about    text default '',
+  email    citext not null,
 
   primary key (forum, nickname)
 );
 
-create table threads (
+cluster forums_users using forums_users_pkey;
+
+create table if not exists threads (
   id      bigserial primary key,
   title   text not null,
   message text not null,
@@ -40,9 +45,10 @@ create table threads (
   constraint slug_unique unique (slug)
 );
 
-cluster threads using threads_pkey;
+create index if not exists threads_forum_created_idx on threads (forum,created);
+cluster threads using threads_forum_created_idx;
 
-create table posts (
+create table if not exists posts (
   id         bigserial primary key,
 
   parent     bigint                   default 0 ,
@@ -57,7 +63,7 @@ create table posts (
   author     citext collate "ucs_basic" references users (nickname)
 );
 
-create table votes (
+create table if not exists votes (
   author citext collate "ucs_basic" references users (nickname),
   thread bigint,
   vote   int default 1,
@@ -65,16 +71,15 @@ create table votes (
   constraint author_thread_unique unique (thread, author)
 );
 
-create index on threads (forum, created);
-create index on posts (thread, id);
-create index on posts (thread, mPath);
-create index on posts (rootParent);
+create index if not exists posts_thread_id_idx on posts (thread, id);
+create index if not exists posts_thread_mpath_idx on posts (thread, mPath);
+create index if not exists posts_rootparent_idx on posts (rootParent);
 
 create or replace function establish_forum_users()
   returns trigger as $$
 begin
-  insert into forums_users (forum, nickname)
-  values (new.forum, new.author)
+  insert into forums_users (forum, nickname, fullname, about, email)
+  select new.forum, nickname, fullname, about, email from users where nickname = new.author
   on conflict do nothing;
   return new;
 end;
@@ -111,16 +116,19 @@ end;
 $$
 language plpgsql;
 
+drop trigger if exists recount_votes_trigger on votes;
 create trigger recount_votes_trigger
   after insert or update
   on votes
   for each row execute procedure recount_votes();
 
+drop trigger if exists new_thread_trigger on threads;
 create trigger new_thread_trigger
   after insert
   on threads
   for each row execute procedure inc_counters();
 
+drop trigger if exists establish_forum_users_threads_trigger on threads;
 create trigger establish_forum_users_threads_trigger
   after insert
   on threads

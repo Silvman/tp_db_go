@@ -29,24 +29,16 @@ EXPOSE 5000
 EXPOSE 5432
 
 # postgres settings
-RUN echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/$PGVER/main/pg_hba.conf &&\
-    echo "listen_addresses='*'" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "synchronous_commit = off" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "fsync = off" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "full_page_writes = off" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "autovacuum = off" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "shared_buffers = 256MB" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "wal_level = minimal" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "wal_writer_delay = 2000ms" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "effective_cache_size = 1024MB" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "max_wal_senders = 0" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
-    echo "work_mem = 16MB" >> /etc/postgresql/$PGVER/main/postgresql.conf
+# postgres settings
+RUN echo "include_dir = 'conf.d'" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
+    mv pg_hba.conf /etc/postgresql/$PGVER/main/ &&\
+    mv forum.conf /etc/postgresql/$PGVER/main/conf.d/
 
 USER postgres
 RUN /etc/init.d/postgresql start &&\
     psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker';" &&\
     createdb -O docker docker &&\
-    psql docker -f base.sql &&\
+    psql -q docker -f base.sql &&\
     /etc/init.d/postgresql stop
 
 CMD service postgresql start && ./forum-server

@@ -17,7 +17,7 @@ var totalPosts int32
 func (self *HandlerDB) GetPostData(ID int) (*models.Post, error) {
 	// todo id не нужен
 	post := &models.Post{}
-	if err := self.pool.QueryRow(qSelectPostById, ID).
+	if err := self.pool.QueryRow(self.psqSelectPostById.Name, ID).
 		Scan(
 			&post.ID,
 			&post.Parent,
@@ -48,7 +48,7 @@ func (self *HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, e
 			case "user":
 				{
 					ePostFull.Author = &models.User{}
-					if err := self.pool.QueryRow(qSelectUserByNick, ePostFull.Post.Author).
+					if err := self.pool.QueryRow(self.psqSelectUserByNick.Name, ePostFull.Post.Author).
 						Scan(&ePostFull.Author.Nickname, &ePostFull.Author.Fullname, &ePostFull.Author.About, &ePostFull.Author.Email); err != nil {
 						//log.Println(err)
 					}
@@ -56,16 +56,8 @@ func (self *HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, e
 
 			case "forum":
 				{
-					ePostFull.Forum = &models.Forum{}
-					if err := self.pool.QueryRow(qSelectForumBySlug, ePostFull.Post.Forum).
-						Scan(
-							&ePostFull.Forum.Slug,
-							&ePostFull.Forum.Title,
-							&ePostFull.Forum.Posts,
-							&ePostFull.Forum.Threads,
-							&ePostFull.Forum.User,
-						); err != nil {
-						//log.Println(err)
+					if ePostFull.Forum, err = self.ForumGetOne(ePostFull.Post.Forum); err != nil {
+						log.Println(err)
 					}
 				}
 
@@ -73,7 +65,7 @@ func (self *HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, e
 				{
 					pgSlug := pgtype.Text{}
 					ePostFull.Thread = &models.Thread{}
-					if err := self.pool.QueryRow(qSelectThreadById, ePostFull.Post.Thread).
+					if err := self.pool.QueryRow(self.psqSelectThreadById.Name, ePostFull.Post.Thread).
 						Scan(
 							&ePostFull.Thread.ID,
 							&ePostFull.Thread.Title,
@@ -131,11 +123,11 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 	var tIdCurrent int32
 	var tForumCurrent string
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := tx.QueryRow(qSelectIdForumFromThreadsSlug, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
+		if err := tx.QueryRow(self.psqSelectIdForumFromThreadsSlug.Name, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := tx.QueryRow(qSelectIdForumFromThreadsId, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
+		if err := tx.QueryRow(self.psqSelectIdForumFromThreadsId.Name, SlugOrID).Scan(&tIdCurrent, &tForumCurrent); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
@@ -204,13 +196,10 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 
 	var par []string
 	var nopar []string
-	auth := make([]interface{}, 0, len(Posts))
-	querries := make([]string, 0, len(Posts))
 
-	auth = append(auth, tForumCurrent)
+	a := make(map[string]bool)
 	for _, value := range Posts {
 		if rows.Next() {
-
 			err = rows.Scan(&value.ID, &value.IsEdited, &value.Created)
 			if err != nil {
 				//log.Println(err)
@@ -222,15 +211,17 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 				nopar = append(nopar, strconv.Itoa(int(value.ID)))
 			}
 
-			auth = append(auth, value.Author)
-			querries = append(querries, fmt.Sprintf(`($1, $%d)`, len(auth)))
-
+			a["'"+value.Author+"'"] = true
 			value.Forum = tForumCurrent
 			value.Thread = tIdCurrent
-
 		}
 	}
 	rows.Close()
+
+	auth := make([]string, 0, len(a))
+	for key := range a {
+		auth = append(auth, key)
+	}
 
 	if err := rows.Err(); err != nil {
 		if err.(pgx.PgError).Code == "23503" {
@@ -253,9 +244,15 @@ where id in (` + strings.Join(par, ",") + ")")
 		tx.Exec("update posts set mPath[1] = id, rootParent = id where id in (" + strings.Join(nopar, ",") + ")")
 	}
 
-	tx.Exec(qUpdateForumPosts, len(Posts), tForumCurrent)
+	tx.Exec(self.psqUpdateForumPosts.Name, len(Posts), tForumCurrent)
 
-	tx.Exec(`insert into forums_users (forum, nickname) values `+strings.Join(querries, ",")+` on conflict do nothing`, auth...)
+	_, err = tx.Exec(`insert into forums_users (forum, nickname, fullname, about, email) 
+select $1, nickname, fullname, about, email from users where nickname in (`+strings.Join(auth, ",")+`) on conflict do nothing`, tForumCurrent)
+	if err != nil {
+		log.Println(`insert into forums_users (forum, nickname, fullname, about, email) 
+select $1, nickname, fullname, about, email from users where nickname in (` + strings.Join(auth, ",") + `) on conflict do nothing`)
+		log.Println(err)
+	}
 
 	err = tx.Commit()
 	if err != nil {

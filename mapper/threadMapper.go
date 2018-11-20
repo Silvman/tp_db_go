@@ -13,12 +13,12 @@ import (
 
 func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.Thread, error) {
 	var author string
-	if err := self.pool.QueryRow(qSelectUsersNickname, Thread.Author).Scan(&author); err != nil {
+	if err := self.pool.QueryRow(self.psqSelectUsersNickname.Name, Thread.Author).Scan(&author); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find thread author by nickname: %s", Thread.Author))
 	}
 
 	// ругается на регистр
-	if err := self.pool.QueryRow(qSelectSlug, Slug).Scan(&Slug); err != nil {
+	if err := self.pool.QueryRow(self.psqSelectSlug.Name, Slug).Scan(&Slug); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find forum by slug: %s", Slug))
 	}
 
@@ -26,9 +26,9 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 	pgSlug := pgtype.Text{}
 	eThread := models.Thread{}
 	if Thread.Slug == "" {
-		err = self.pool.QueryRow(qSelectThreadsForumTitle, Thread.Title, Slug, Thread.Message).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
+		err = self.pool.QueryRow(self.psqSelectThreadsForumTitle.Name, Thread.Title, Slug, Thread.Message).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
 	} else {
-		err = self.pool.QueryRow(qSelectThreadsForumSlug, Thread.Slug).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
+		err = self.pool.QueryRow(self.psqSelectThreadsForumSlug.Name, Thread.Slug).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author)
 	}
 
 	if err == nil {
@@ -42,15 +42,15 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 	Thread.Forum = Slug
 	if Thread.Created.IsZero() {
 		if Thread.Slug != "" {
-			err = self.pool.QueryRow(qInsertThreadSlug, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Slug).Scan(&Thread.ID, &Thread.Created)
+			err = self.pool.QueryRow(self.psqInsertThreadSlug.Name, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Slug).Scan(&Thread.ID, &Thread.Created)
 		} else {
-			err = self.pool.QueryRow(qInsertThread, Thread.Title, Thread.Message, Thread.Author, Slug).Scan(&Thread.ID, &Thread.Created)
+			err = self.pool.QueryRow(self.psqInsertThread.Name, Thread.Title, Thread.Message, Thread.Author, Slug).Scan(&Thread.ID, &Thread.Created)
 		}
 	} else {
 		if Thread.Slug != "" {
-			err = self.pool.QueryRow(qInsertThreadCreatedSlug, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Created, Thread.Slug).Scan(&Thread.ID, &Thread.Created)
+			err = self.pool.QueryRow(self.psqInsertThreadCreatedSlug.Name, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Created, Thread.Slug).Scan(&Thread.ID, &Thread.Created)
 		} else {
-			err = self.pool.QueryRow(qInsertThreadCreated, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Created).Scan(&Thread.ID, &Thread.Created)
+			err = self.pool.QueryRow(self.psqInsertThreadCreated.Name, Thread.Title, Thread.Message, Thread.Author, Slug, Thread.Created).Scan(&Thread.ID, &Thread.Created)
 		}
 	}
 
@@ -66,11 +66,11 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 	eThread := models.Thread{}
 
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := self.pool.QueryRow(qSelectThreadBySlug, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectThreadBySlug.Name, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := self.pool.QueryRow(qSelectThreadById, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectThreadById.Name, SlugOrID).Scan(&eThread.ID, &eThread.Title, &eThread.Message, &eThread.Votes, &pgSlug, &eThread.Created, &eThread.Forum, &eThread.Author); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
@@ -85,11 +85,11 @@ func (self HandlerDB) ThreadGetOne(SlugOrID string) (*models.Thread, error) {
 func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, Desc *bool, Limit *int) (*models.Posts, error) {
 	var tId int32
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsSlug.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsId.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
@@ -105,15 +105,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsFSinceDesc", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsFSinceDesc.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsFDesc", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsFDesc.Name, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsFSince", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsFSince.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsF", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsF.Name, tId, *Limit)
 				}
 			}
 		}
@@ -122,15 +122,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsTSinceDesc", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsTSinceDesc.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsTDesc", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsTDesc.Name, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsTSince", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsTSince.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsT", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsT.Name, tId, *Limit)
 				}
 			}
 		}
@@ -139,15 +139,15 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		{
 			if Desc != nil && *Desc {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsPTSinceDesc", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsPTSinceDesc.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsPTDesc", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsPTDesc.Name, tId, *Limit)
 				}
 			} else {
 				if Since != nil {
-					rows, err = self.pool.Query("qSelectPostsPTSince", tId, *Since, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsPTSince.Name, tId, *Since, *Limit)
 				} else {
-					rows, err = self.pool.Query("qSelectPostsPT", tId, *Limit)
+					rows, err = self.pool.Query(self.psqSelectPostsPT.Name, tId, *Limit)
 				}
 			}
 		}
@@ -157,7 +157,7 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 		log.Println(err)
 	}
 
-	fetchPosts := models.Posts{}
+	fetchPosts := make(models.Posts, 0, *Limit)
 	pgSlug := pgtype.Text{}
 
 	for rows.Next() {
@@ -180,11 +180,11 @@ func (self HandlerDB) ThreadGetPosts(SlugOrID string, Sort *string, Since *int, 
 func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate) (*models.Thread, error) {
 	var tId int32
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsSlug.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsId.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
@@ -232,22 +232,22 @@ func (self HandlerDB) ThreadUpdate(SlugOrID string, Thread *models.ThreadUpdate)
 func (self HandlerDB) ThreadVote(SlugOrID string, Vote *models.Vote) (*models.Thread, error) {
 	var tId int32
 	if _, err := strconv.Atoi(SlugOrID); err != nil {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsSlug, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsSlug.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by slug: %s", SlugOrID))
 		}
 	} else {
-		if err := self.pool.QueryRow(qSelectIdFromThreadsId, SlugOrID).Scan(&tId); err != nil {
+		if err := self.pool.QueryRow(self.psqSelectIdFromThreadsId.Name, SlugOrID).Scan(&tId); err != nil {
 			return nil, errors.New(fmt.Sprintf("Can't find thread by id: %s", SlugOrID))
 		}
 	}
 
-	if _, err := self.pool.Exec(qInsterVote, Vote.Nickname, tId, Vote.Voice); err != nil {
+	if _, err := self.pool.Exec(self.psqInsertVote.Name, Vote.Nickname, tId, Vote.Voice); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname: %s", Vote.Nickname))
 	}
 
 	pgSlug := pgtype.Text{}
 	updThread := models.Thread{}
-	if err := self.pool.QueryRow(qSelectThreadById, tId).
+	if err := self.pool.QueryRow(self.psqSelectThreadById.Name, tId).
 		Scan(
 			&updThread.ID,
 			&updThread.Title,

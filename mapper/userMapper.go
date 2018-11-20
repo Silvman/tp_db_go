@@ -7,7 +7,7 @@ import (
 )
 
 func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models.Users, error) {
-	rows, _ := self.pool.Query(qSelectUserByNickEmail, Nickname, Profile.Email)
+	rows, _ := self.pool.Query(self.psqSelectUserByNickEmail.Name, Nickname, Profile.Email)
 	eUsers := models.Users{}
 	for rows.Next() {
 		eUser := models.User{}
@@ -19,7 +19,7 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 		return &eUsers, errors.New("already exists")
 	}
 
-	_, err := self.pool.Exec(qInsertUser, Nickname, Profile.Fullname, Profile.About, Profile.Email)
+	_, err := self.pool.Exec(self.psqInsertUser.Name, Nickname, Profile.Fullname, Profile.About, Profile.Email)
 	if err != nil {
 		//log.Println(err)
 	}
@@ -32,7 +32,7 @@ func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models
 
 func (self HandlerDB) UserGetOne(Nickname string) (*models.User, error) {
 	eUser := models.User{}
-	if err := self.pool.QueryRow(qSelectUserByNick, Nickname).
+	if err := self.pool.QueryRow(self.psqSelectUserByNick.Name, Nickname).
 		Scan(&eUser.Nickname, &eUser.Fullname, &eUser.About, &eUser.Email); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname: %s", Nickname))
 	}
@@ -42,7 +42,7 @@ func (self HandlerDB) UserGetOne(Nickname string) (*models.User, error) {
 
 func (self HandlerDB) UserUpdate(Nickname string, Profile *models.UserUpdate) (*models.User, error) {
 	tempUser := models.User{}
-	if err := self.pool.QueryRow(qSelectUserByNick, Nickname).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
+	if err := self.pool.QueryRow(self.psqSelectUserByNick.Name, Nickname).Scan(&tempUser.Nickname, &tempUser.Fullname, &tempUser.About, &tempUser.Email); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find user by nickname"))
 	}
 
