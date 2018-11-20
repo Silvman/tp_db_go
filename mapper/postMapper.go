@@ -263,8 +263,8 @@ select $1, nickname, fullname, about, email from users where nickname in (` + st
 
 	if atomic.LoadInt32(&totalPosts) >= 1500000 {
 		//log.Println("VACUUM ANALYZE")
-		self.pool.Exec("cluster")
 		self.pool.Exec("VACUUM ANALYZE")
+		self.pool.Exec("cluster")
 		//log.Println("VACUUM ANALYZE end")
 	}
 
