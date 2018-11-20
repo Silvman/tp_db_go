@@ -208,7 +208,7 @@ const schemaPath = `./base.sql`
 
 func NewHandler() (*HandlerDB, error) {
 	config := pgx.ConnConfig{
-		Host:     "/run/postgresql",
+		Host:     "/tmp",
 		Port:     5432,
 		User:     "docker",
 		Database: "docker",

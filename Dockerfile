@@ -12,8 +12,8 @@ RUN apt update -y &&\
     apt update -y  &&\
     apt install -y postgresql-$PGVER
 
-RUN wget https://dl.google.com/go/go1.11.2.linux-amd64.tar.gz &&\
-    tar -xvf go1.11.2.linux-amd64.tar.gz &&\
+RUN wget https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz &&\
+    tar -xvf go1.9.2.linux-amd64.tar.gz &&\
     mv go /usr/local
 
 ENV GOROOT /usr/local/go
