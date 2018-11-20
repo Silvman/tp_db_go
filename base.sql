@@ -10,6 +10,7 @@ create table users (
   constraint users_id_uniq unique (id)
 );
 
+cluster users using users_id_uniq;
 create index on users (nickname, id);
 
 create table forums (
@@ -26,7 +27,6 @@ create table forums_users (
 
   primary key (forum, uid)
 );
-
 
 create table threads (
   id      bigserial primary key,
@@ -66,6 +66,7 @@ create table votes (
 
 create index on threads (forum, created);
 create index on posts (thread, id);
+create index on posts (thread, mPath);
 create index on posts (rootParent);
 
 create or replace function establish_forum_users()

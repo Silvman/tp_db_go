@@ -14,23 +14,32 @@ import (
 
 var totalPosts int32
 
-func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, error) {
-	ePostFull := models.PostFull{}
-	ePostFull.Post = &models.Post{}
-
-	// todo а нам нужны все эти поля?
+func (self *HandlerDB) GetPostData(ID int) (*models.Post, error) {
+	// todo id не нужен
+	post := &models.Post{}
 	if err := self.pool.QueryRow(qSelectPostById, ID).
 		Scan(
-			&ePostFull.Post.ID,
-			&ePostFull.Post.Parent,
-			&ePostFull.Post.Message,
-			&ePostFull.Post.IsEdited,
-			&ePostFull.Post.Forum,
-			&ePostFull.Post.Created,
-			&ePostFull.Post.Thread,
-			&ePostFull.Post.Author,
+			&post.ID,
+			&post.Parent,
+			&post.Message,
+			&post.IsEdited,
+			&post.Forum,
+			&post.Created,
+			&post.Thread,
+			&post.Author,
 		); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find post with id: %s", ID))
+	}
+
+	return post, nil
+}
+
+func (self *HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, error) {
+	ePostFull := models.PostFull{}
+
+	var err error
+	if ePostFull.Post, err = self.GetPostData(ID); err != nil {
+		return nil, err
 	}
 
 	if Related != nil {
@@ -89,20 +98,9 @@ func (self HandlerDB) PostGetOne(ID int, Related []string) (*models.PostFull, er
 	return &ePostFull, nil
 }
 
-func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post, error) {
-	ePost := models.Post{}
-
-	if err := self.pool.QueryRow(qSelectPostById, ID).Scan(
-		&ePost.ID,
-		&ePost.Parent,
-		&ePost.Message,
-		&ePost.IsEdited,
-		&ePost.Forum,
-		&ePost.Created,
-		&ePost.Thread,
-		&ePost.Author,
-	); err != nil {
-		return nil, errors.New(fmt.Sprintf("Can't find post with id: %d", ID))
+func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (ePost *models.Post, err error) {
+	if ePost, err = self.GetPostData(ID); err != nil {
+		return nil, err
 	}
 
 	if Post.Message != "" && Post.Message != ePost.Message {
@@ -116,11 +114,11 @@ func (self HandlerDB) PostUpdate(ID int, Post *models.PostUpdate) (*models.Post,
 			&ePost.Thread,
 			&ePost.Author,
 		); err != nil {
-			//log.Println(err)
+			log.Println(err)
 		}
 	}
 
-	return &ePost, nil
+	return
 }
 
 func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.Posts, error) {
@@ -268,6 +266,7 @@ where id in (` + strings.Join(par, ",") + ")")
 
 	if atomic.LoadInt32(&totalPosts) >= 1500000 {
 		//log.Println("VACUUM ANALYZE")
+		self.pool.Exec("cluster")
 		self.pool.Exec("VACUUM ANALYZE")
 		//log.Println("VACUUM ANALYZE end")
 	}

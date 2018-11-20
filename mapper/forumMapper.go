@@ -6,19 +6,12 @@ import (
 	"github.com/Silvman/tech-db-forum/models"
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
+	"log"
 )
 
 func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
-	forumExisting := models.Forum{}
-	if err := self.pool.QueryRow(qSelectForumBySlug, Forum.Slug).
-		Scan(
-			&forumExisting.Slug,
-			&forumExisting.Title,
-			&forumExisting.Posts,
-			&forumExisting.Threads,
-			&forumExisting.User,
-		); err == nil {
-		return &forumExisting, errors.New("already exists")
+	if forumExisting, err := self.ForumGetOne(Forum.Slug); err == nil {
+		return forumExisting, errors.New("already exists")
 	}
 
 	var nickname string
@@ -28,7 +21,7 @@ func (self *HandlerDB) ForumCreate(Forum *models.Forum) (*models.Forum, error) {
 
 	if err := self.pool.QueryRow(qInsertForum, Forum.Slug, Forum.Title, nickname).
 		Scan(&Forum.User); err != nil {
-		//log.Println(err)
+		log.Println(err)
 	}
 
 	return Forum, nil
@@ -50,35 +43,41 @@ func (self *HandlerDB) ForumGetOne(Slug string) (*models.Forum, error) {
 	return &forumExisting, nil
 }
 
-func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Limit *int) (models.Threads, error) {
-	var eSlug string
-	if err := self.pool.QueryRow(qSelectSlug, Slug).Scan(&eSlug); err != nil {
-		return nil, errors.New(fmt.Sprintf("Can't find forum with slug: %s", Slug))
+func (self *HandlerDB) CheckForumNotExists(Slug string) error {
+	var temp int
+	if err := self.pool.QueryRow(qCheckForum, Slug).Scan(&temp); err != nil {
+		return errors.New(fmt.Sprintf("Can't find forum with slug: %s", Slug))
+	}
+
+	return nil
+}
+
+func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Limit *int) (*models.Threads, error) {
+	if err := self.CheckForumNotExists(Slug); err != nil {
+		return nil, err
 	}
 
 	var rows *pgx.Rows
 	if Desc != nil && *Desc {
 		if Since != nil {
-			rows, _ = self.pool.Query(self.psqSelectThreadsCreatedDesc.Name, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsCreatedDesc.Name, Slug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(self.psqSelectThreadsDesc.Name, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsDesc.Name, Slug, *Limit)
 		}
 	} else {
 		if Since != nil {
-			rows, _ = self.pool.Query(self.psqSelectThreadsCreated.Name, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreadsCreated.Name, Slug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(self.psqSelectThreads.Name, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectThreads.Name, Slug, *Limit)
 		}
 	}
 
+	// todo eu
 	existingThreads := make(models.Threads, 0, 20)
 	pgSlug := pgtype.Text{}
 	for rows.Next() {
 		thread := models.Thread{}
-		if err := rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author); err != nil {
-			//log.Println(err)
-		}
-
+		rows.Scan(&thread.ID, &thread.Title, &thread.Message, &thread.Votes, &pgSlug, &thread.Created, &thread.Forum, &thread.Author)
 		if pgSlug.Status != pgtype.Null {
 			thread.Slug = pgSlug.String
 		}
@@ -86,27 +85,26 @@ func (self HandlerDB) ForumGetThreads(Slug string, Desc *bool, Since *string, Li
 		existingThreads = append(existingThreads, &thread)
 	}
 
-	return existingThreads, nil
+	return &existingThreads, nil
 }
 
-func (self HandlerDB) ForumGetUsers(Slug string, Desc *bool, Since *string, Limit *int) (models.Users, error) {
-	var eSlug string
-	if err := self.pool.QueryRow(qSelectSlug, Slug).Scan(&eSlug); err != nil {
-		return nil, errors.New(fmt.Sprintf("Can't find forum by slug: %s", Slug))
+func (self HandlerDB) ForumGetUsers(Slug string, Desc *bool, Since *string, Limit *int) (*models.Users, error) {
+	if err := self.CheckForumNotExists(Slug); err != nil {
+		return nil, err
 	}
 
 	var rows *pgx.Rows
 	if Desc != nil && *Desc {
 		if Since != nil {
-			rows, _ = self.pool.Query(self.psqSelectUsersSinceDesc.Name, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersSinceDesc.Name, Slug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(self.psqSelectUsersDesc.Name, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersDesc.Name, Slug, *Limit)
 		}
 	} else {
 		if Since != nil {
-			rows, _ = self.pool.Query(self.psqSelectUsersSince.Name, eSlug, *Since, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsersSince.Name, Slug, *Since, *Limit)
 		} else {
-			rows, _ = self.pool.Query(self.psqSelectUsers.Name, eSlug, *Limit)
+			rows, _ = self.pool.Query(self.psqSelectUsers.Name, Slug, *Limit)
 		}
 	}
 
@@ -117,5 +115,5 @@ func (self HandlerDB) ForumGetUsers(Slug string, Desc *bool, Since *string, Limi
 		existingUsers = append(existingUsers, &t)
 	}
 
-	return existingUsers, nil
+	return &existingUsers, nil
 }

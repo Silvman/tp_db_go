@@ -11,14 +11,13 @@ import (
 	"strings"
 )
 
-const qInsterVote = `insert into votes (author, thread, vote) values ($1, $2, $3) on conflict (author, thread) do update set vote = $3`
-
 func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.Thread, error) {
 	var author string
 	if err := self.pool.QueryRow(qSelectUsersNickname, Thread.Author).Scan(&author); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find thread author by nickname: %s", Thread.Author))
 	}
 
+	// ругается на регистр
 	if err := self.pool.QueryRow(qSelectSlug, Slug).Scan(&Slug); err != nil {
 		return nil, errors.New(fmt.Sprintf("Can't find forum by slug: %s", Slug))
 	}

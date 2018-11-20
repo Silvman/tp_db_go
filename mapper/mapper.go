@@ -7,6 +7,7 @@ import (
 const qSelectForumBySlug = `select slug, title, posts, threads, owner from forums where slug = $1`
 const qSelectUsersNickname = `select nickname from users where nickname = $1`
 const qInsertForum = `insert into forums (slug, title, owner) values ($1, $2, $3) returning owner`
+const qCheckForum = `select 1 from forums where slug = $1`
 const qSelectSlug = `select slug from forums where slug = $1`
 
 const qSelectUsersSinceDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname < $2 order by u.nickname desc limit $3`
@@ -99,6 +100,19 @@ const qSelectPostsFDesc = `select id, parent, message, isEdit, forum, created, t
 const qSelectPostsF = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 order by id limit $2`
 const qSelectPostsFSinceDesc = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id < $2 order by id desc limit $3`
 const qSelectPostsFSince = `select id, parent, message, isEdit, forum, created, thread, author from posts where thread = $1 and id > $2 order by id limit $3`
+
+const qInsertUser = `insert into users values ($1, $2, $3, $4)`
+const qSelectUserByNickEmail = `select nickname, fullname, about, email from users where nickname = $1 or email = $2`
+
+const qUpdateUserFullname = `update users set fullname = $1 where nickname = $2`
+const qUpdateUserFullnameAbout = `update users set fullname = $1,about = $2 where nickname = $3`
+const qUpdateUserFullnameEmail = `update users set fullname = $1,email = $2 where nickname = $3`
+const qUpdateUserFullnameEmailAbout = `update users set fullname = $1,email = $2,about = $3 where nickname = $4`
+const qUpdateUserAbout = `update users set about = $1 where nickname = $2`
+const qUpdateUserEmail = `update users set email = $1 where nickname = $2`
+const qUpdateUserEmailAbout = `update users set email = $1,about = $2 where nickname = $3`
+
+const qInsterVote = `insert into votes (author, thread, vote) values ($1, $2, $3) on conflict (author, thread) do update set vote = $3`
 
 type HandlerDB struct {
 	pool      *pgx.ConnPool

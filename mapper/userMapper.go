@@ -6,19 +6,6 @@ import (
 	"github.com/Silvman/tech-db-forum/models"
 )
 
-const qInsertUser = `insert into users values ($1, $2, $3, $4)`
-const qSelectUserByNickEmail = `select nickname, fullname, about, email from users where nickname = $1 or email = $2`
-
-const qUpdateUserFullname = `update users set fullname = $1 where nickname = $2`
-const qUpdateUserFullnameAbout = `update users set fullname = $1,about = $2 where nickname = $3`
-const qUpdateUserFullnameEmail = `update users set fullname = $1,email = $2 where nickname = $3`
-const qUpdateUserFullnameEmailAbout = `update users set fullname = $1,email = $2,about = $3 where nickname = $4`
-const qUpdateUserAbout = `update users set about = $1 where nickname = $2`
-const qUpdateUserEmail = `update users set email = $1 where nickname = $2`
-const qUpdateUserEmailAbout = `update users set email = $1,about = $2 where nickname = $3`
-
-//returning nickname, fullname, about, email
-
 func (self HandlerDB) UserCreate(Nickname string, Profile *models.User) (*models.Users, error) {
 	rows, _ := self.pool.Query(qSelectUserByNickEmail, Nickname, Profile.Email)
 	eUsers := models.Users{}

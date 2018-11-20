@@ -11,6 +11,8 @@ func (self HandlerDB) Clear() error {
 		log.Println(err)
 	}
 
+	atomic.StoreInt32(&totalPosts, 0)
+
 	return nil
 }
 
@@ -20,8 +22,6 @@ func (self HandlerDB) Status() *models.Status {
 	self.pool.QueryRow("select count(*) from forums").Scan(&status.Forum)
 	self.pool.QueryRow("select count(*) from threads").Scan(&status.Thread)
 	self.pool.QueryRow("select count(*) from posts").Scan(&status.Post)
-
-	atomic.StoreInt32(&totalPosts, 0)
 
 	return &status
 }
