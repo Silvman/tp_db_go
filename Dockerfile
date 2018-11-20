@@ -37,6 +37,7 @@ RUN echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/$PGVER/main/pg_hba
     echo "autovacuum = off" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
     echo "shared_buffers = 256MB" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
     echo "wal_level = minimal" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
+    echo "wal_writer_delay = 2000ms" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
     echo "effective_cache_size = 1024MB" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
     echo "max_wal_senders = 0" >> /etc/postgresql/$PGVER/main/postgresql.conf &&\
     echo "work_mem = 16MB" >> /etc/postgresql/$PGVER/main/postgresql.conf

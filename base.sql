@@ -4,14 +4,11 @@ create table users (
   fullname text default '',
   about    text default '',
   email    citext not null,
-  id       bigserial,
 
-  constraint email_unique unique (email),
-  constraint users_id_uniq unique (id)
+  constraint email_unique unique (email)
 );
 
-cluster users using users_id_uniq;
-create index on users (nickname, id);
+cluster users using users_pkey;
 
 create table forums (
   slug    citext primary key,
@@ -21,11 +18,13 @@ create table forums (
   threads bigint default 0
 );
 
+cluster forums using forums_pkey;
+
 create table forums_users (
   forum citext collate "ucs_basic",
-  uid   bigserial,
+  nickname citext collate "ucs_basic",
 
-  primary key (forum, uid)
+  primary key (forum, nickname)
 );
 
 create table threads (
@@ -40,6 +39,8 @@ create table threads (
 
   constraint slug_unique unique (slug)
 );
+
+cluster threads using threads_pkey;
 
 create table posts (
   id         bigserial primary key,
@@ -72,8 +73,8 @@ create index on posts (rootParent);
 create or replace function establish_forum_users()
   returns trigger as $$
 begin
-  insert into forums_users (forum, uid)
-  values (new.forum, (select id from users where nickname = new.author))
+  insert into forums_users (forum, nickname)
+  values (new.forum, new.author)
   on conflict do nothing;
   return new;
 end;

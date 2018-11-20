@@ -223,7 +223,7 @@ func (self HandlerDB) PostsCreate(SlugOrID string, Posts models.Posts) (models.P
 			}
 
 			auth = append(auth, value.Author)
-			querries = append(querries, fmt.Sprintf(`($1, (select id from users where nickname = $%d))`, len(auth)))
+			querries = append(querries, fmt.Sprintf(`($1, $%d)`, len(auth)))
 
 			value.Forum = tForumCurrent
 			value.Thread = tIdCurrent
@@ -255,7 +255,7 @@ where id in (` + strings.Join(par, ",") + ")")
 
 	tx.Exec(qUpdateForumPosts, len(Posts), tForumCurrent)
 
-	tx.Exec(`insert into forums_users (forum, uid) values `+strings.Join(querries, ",")+` on conflict do nothing`, auth...)
+	tx.Exec(`insert into forums_users (forum, nickname) values `+strings.Join(querries, ",")+` on conflict do nothing`, auth...)
 
 	err = tx.Commit()
 	if err != nil {

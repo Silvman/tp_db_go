@@ -10,10 +10,39 @@ const qInsertForum = `insert into forums (slug, title, owner) values ($1, $2, $3
 const qCheckForum = `select 1 from forums where slug = $1`
 const qSelectSlug = `select slug from forums where slug = $1`
 
-const qSelectUsersSinceDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname < $2 order by u.nickname desc limit $3`
-const qSelectUsersDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname desc limit $2`
-const qSelectUsersSince = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname > $2 order by u.nickname limit $3`
-const qSelectUsers = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname limit $2`
+const qSelectUsersSinceDesc = `
+select u.nickname, u.fullname, u.about, u.email from users u
+join forums_users fu on fu.nickname = u.nickname 
+where fu.forum = $1 and 
+      fu.nickname < $2 
+order by u.nickname desc 
+limit $3`
+
+const qSelectUsersDesc = `
+select u.nickname, u.fullname, u.about, u.email from users u
+join forums_users fu on fu.nickname = u.nickname
+where fu.forum = $1
+order by u.nickname desc
+limit $2`
+
+const qSelectUsersSince = `
+select u.nickname, u.fullname, u.about, u.email from users u
+join forums_users fu on fu.nickname = u.nickname 
+where fu.forum = $1 and 
+      fu.nickname > $2 
+order by u.nickname 
+limit $3`
+
+const qSelectUsers = `
+select u.nickname, u.fullname, u.about, u.email from users u
+join forums_users fu on fu.nickname = u.nickname 
+where fu.forum = $1 
+order by u.nickname 
+limit $2`
+
+//const qSelectUsersDesc = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname desc limit $2`
+//const qSelectUsersSince = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 and u.nickname > $2 order by u.nickname limit $3`
+//const qSelectUsers = `select u.nickname, fullname, about, email from forums_users join users u on forums_users.uid = u.id where forum = $1 order by u.nickname limit $2`
 
 const qSelectThreadsCreatedDesc = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created <= $2::timestamptz order by created desc limit $3`
 const qSelectThreadsCreated = `select id, title, message, votes, slug, created, forum, author from threads where forum = $1 and created >= $2::timestamptz order by created limit $3`

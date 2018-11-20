@@ -54,6 +54,10 @@ func (self HandlerDB) ThreadCreate(Slug string, Thread *models.Thread) (*models.
 		}
 	}
 
+	if err != nil {
+		log.Println(err)
+	}
+
 	return Thread, nil
 }
 
