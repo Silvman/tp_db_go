@@ -11,6 +11,10 @@ func (self HandlerDB) Clear() error {
 		log.Println(err)
 	}
 
+	if _, err := self.pool.Exec(`vacuum`); err != nil {
+		log.Println(err)
+	}
+
 	atomic.StoreInt32(&totalPosts, 0)
 
 	return nil
